@@ -14,7 +14,7 @@ import (
 func (r *Runner) AddGrpcServer(srv *grpc.Server) {
 	r.eg.Go(func() error {
 		port := r.app.Config.Grpc.Port
-		r.app.Logger.Info("starting grpc server", logger.LogFields{"port": port})
+		r.app.Logger().Info("starting grpc server", logger.LogFields{"port": port})
 		return serveOnPort(srv, port)
 	})
 }

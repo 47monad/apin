@@ -9,7 +9,7 @@ import (
 )
 
 type App struct {
-	Logger          logger.Logger
+	LoggerShell     *initr.LoggerShell
 	Config          *sercon.Config
 	MongodbShell    *initr.MongodbShell
 	PrometheusShell *initr.PrometheusShell
@@ -20,25 +20,13 @@ func (app *App) GetName() string {
 	return app.Config.Name
 }
 
-type AppOption func(*App)
-
-func WithLogger(l logger.Logger) AppOption {
-	return func(a *App) {
-		a.Logger = l
-	}
+func (app *App) Logger() logger.Logger {
+	return app.LoggerShell.Logger
 }
 
-func WithConfig(config *sercon.Config) AppOption {
-	return func(a *App) {
-		a.Config = config
-	}
-}
-
-func New(opts ...AppOption) *App {
-	app := &App{}
-
-	for _, opt := range opts {
-		opt(app)
+func FromConfig(config *sercon.Config) *App {
+	app := &App{
+		Config: config,
 	}
 
 	return app
@@ -85,7 +73,7 @@ func (app *App) InitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder)
 		opts = initropts.GrpcServer()
 	}
 	if app.Config.Grpc.UseLogging {
-		opts.SetLogging(app.Logger)
+		opts.SetLogging(app.Logger())
 	}
 	if app.Config.Grpc.UseReflection {
 		opts.WithReflection()
@@ -110,4 +98,17 @@ func (app *App) MustInitGrpc(ctx context.Context, opts *initropts.GrpcServerBuil
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (app *App) InitZap(ctx context.Context) error {
+	shell, err := initr.Zap(ctx, initropts.Zap())
+	if err != nil {
+		return err
+	}
+	app.LoggerShell = shell
+	return nil
+}
+
+func (app *App) MustInitZap(ctx context.Context) {
+	app.MustInit(ctx, app.InitZap)
 }

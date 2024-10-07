@@ -1,7 +1,6 @@
 package apin
 
 import (
-	"github.com/47monad/apin/internal/logger"
 	"github.com/47monad/sercon"
 )
 
@@ -21,11 +20,8 @@ func Bootstrap(filename string, options ...BootstrapOption) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	lgr, err := Init(logger.ZAP)
-	if err != nil {
-		return nil, err
-	}
-	app := New(WithLogger(lgr), WithConfig(conf))
+
+	app := FromConfig(conf)
 
 	return app, nil
 }
