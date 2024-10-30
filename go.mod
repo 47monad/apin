@@ -3,7 +3,7 @@ module github.com/47monad/apin
 go 1.22.3
 
 require (
-	github.com/47monad/sercon v0.0.5
+	github.com/47monad/sercon v0.0.6
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/prometheus/client_golang v1.20.4
@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/apple/pkl-go v0.8.0 // indirect
+	github.com/apple/pkl-go v0.8.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
