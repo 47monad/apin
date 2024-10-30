@@ -1,19 +1,24 @@
 package apin
 
 import (
+	"fmt"
+
 	"github.com/47monad/sercon"
 )
 
 type BootstrapOptions struct {
-	ConfigPath string
-	EnvPath    string
-	UseRelay   bool
+	BasePath       string
+	ConfigPath     string
+	EnvPath        string
+	configFullPath string
+	envFullPath    string
+	UseRelay       bool
 }
 
 type BootstrapOption func(*BootstrapOptions)
 
-func Bootstrap(filename string, options ...BootstrapOption) (*App, error) {
-	opts := prepareOptions(filename, options)
+func Bootstrap(options ...BootstrapOption) (*App, error) {
+	opts := prepareOptions(options)
 	conf, err := getConfig(opts)
 	if err != nil {
 		return nil, err
@@ -27,19 +32,21 @@ func Bootstrap(filename string, options ...BootstrapOption) (*App, error) {
 func getConfig(opts *BootstrapOptions) (*sercon.Config, error) {
 	if opts.UseRelay {
 		return sercon.LoadFromRelay(
-			sercon.WithConfigPath(opts.ConfigPath),
+			sercon.WithConfigPath(opts.configFullPath),
 		)
 	}
 	return sercon.Load(
-		sercon.WithConfigPath(opts.ConfigPath),
-		sercon.WithEnvPath(opts.EnvPath),
+		sercon.WithConfigPath(opts.configFullPath),
+		sercon.WithEnvPath(opts.envFullPath),
 	)
 }
 
-func prepareOptions(filename string, opts []BootstrapOption) *BootstrapOptions {
+func prepareOptions(opts []BootstrapOption) *BootstrapOptions {
+	basePath := "./config"
 	newOpts := &BootstrapOptions{
-		ConfigPath: "./config/" + filename + ".pkl",
-		EnvPath:    "./config/." + filename + ".env",
+		BasePath:   basePath,
+		ConfigPath: "app.pkl",
+		EnvPath:    ".env",
 		UseRelay:   false,
 	}
 
@@ -47,7 +54,16 @@ func prepareOptions(filename string, opts []BootstrapOption) *BootstrapOptions {
 		opt(newOpts)
 	}
 
+	newOpts.configFullPath = fmt.Sprintf("%s/%s", newOpts.BasePath, newOpts.ConfigPath)
+	newOpts.envFullPath = fmt.Sprintf("%s/%s", newOpts.BasePath, newOpts.EnvPath)
+
 	return newOpts
+}
+
+func WithBasePath(path string) BootstrapOption {
+	return func(opts *BootstrapOptions) {
+		opts.BasePath = path
+	}
 }
 
 func WithConfigPath(path string) BootstrapOption {
