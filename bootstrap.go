@@ -29,6 +29,24 @@ func Bootstrap(options ...BootstrapOption) (*App, error) {
 	return app, nil
 }
 
+func BootstrapFromJson(options ...BootstrapOption) (*App, error) {
+	opts := prepareOptions(options)
+	conf, err := getConfigFromJson(opts.configFullPath)
+	if err != nil {
+		return nil, err
+	}
+
+	app := FromConfig(conf)
+
+	return app, nil
+}
+
+func getConfigFromJson(path string) (*sercon.Config, error) {
+	return sercon.LoadFromRelay(
+		sercon.WithConfigPath(path),
+	)
+}
+
 func getConfig(opts *BootstrapOptions) (*sercon.Config, error) {
 	if opts.UseRelay {
 		return sercon.LoadFromRelay(
