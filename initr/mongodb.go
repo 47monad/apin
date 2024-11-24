@@ -3,9 +3,10 @@ package initr
 import (
 	"context"
 	"fmt"
-	"github.com/47monad/apin/initropts"
-	"go.mongodb.org/mongo-driver/mongo"
 	"time"
+
+	"github.com/47monad/apin/initropts"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type MongodbShell struct {
@@ -29,13 +30,13 @@ func initMongodb(ctx context.Context, b initropts.Builder[*initropts.MongodbStor
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	client, err := mongo.Connect(ctx, store.Opts)
+	client, err := mongo.Connect(store.Opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
 	if err = client.Ping(ctx, nil); err != nil {
 		return nil, fmt.Errorf("problem pinging database: %v", err)

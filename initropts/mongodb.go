@@ -1,9 +1,13 @@
 package initropts
 
-import "go.mongodb.org/mongo-driver/mongo/options"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+)
 
 type MongodbStore struct {
-	Opts *options.ClientOptions
+	Opts *options.ClientOptionsBuilder
 }
 
 type MongodbBuilder struct {
@@ -31,6 +35,14 @@ func (b *MongodbBuilder) Build() (*MongodbStore, error) {
 func (b *MongodbBuilder) SetUri(uri string) *MongodbBuilder {
 	b.Opts = append(b.Opts, func(o *MongodbStore) error {
 		o.Opts.ApplyURI(uri)
+		return nil
+	})
+	return b
+}
+
+func (b *MongodbBuilder) SetTimeout(d time.Duration) *MongodbBuilder {
+	b.Opts = append(b.Opts, func(o *MongodbStore) error {
+		o.Opts.SetConnectTimeout(d)
 		return nil
 	})
 	return b

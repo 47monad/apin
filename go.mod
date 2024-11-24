@@ -7,7 +7,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/prometheus/client_golang v1.20.4
-	go.mongodb.org/mongo-driver v1.17.1
+	go.mongodb.org/mongo-driver/v2 v2.0.0-beta2
 	go.opentelemetry.io/otel/trace v1.30.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.8.0
@@ -21,7 +21,6 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
-	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.60.0 // indirect
