@@ -58,7 +58,7 @@ func (app *App) InitPrometheus(ctx context.Context) error {
 	return nil
 }
 
-func (app *App) Must(err error) {
+func Must(err error) {
 	if err != nil {
 		panic(err)
 	}
@@ -87,13 +87,6 @@ func (app *App) InitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder)
 	}
 	app.GrpcServerShell = shell
 	return nil
-}
-
-func (app *App) MustInitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder) {
-	err := app.InitGrpc(ctx, opts)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (app *App) InitZap(ctx context.Context) error {
