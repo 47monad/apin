@@ -2,6 +2,7 @@ package apin
 
 import (
 	"context"
+
 	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
 	"github.com/47monad/apin/internal/logger"
@@ -10,14 +11,18 @@ import (
 
 type App struct {
 	LoggerShell     *initr.LoggerShell
-	Config          *sercon.Config
+	config          *sercon.Config
 	MongodbShell    *initr.MongodbShell
 	PrometheusShell *initr.PrometheusShell
 	GrpcServerShell *initr.GrpcServerShell
 }
 
 func (app *App) GetName() string {
-	return app.Config.Name
+	return app.config.Name
+}
+
+func (app *App) GetConfig() *sercon.Config {
+	return app.config
 }
 
 func (app *App) Logger() logger.Logger {
@@ -26,25 +31,21 @@ func (app *App) Logger() logger.Logger {
 
 func FromConfig(config *sercon.Config) *App {
 	app := &App{
-		Config: config,
+		config: config,
 	}
 
 	return app
 }
 
 func (app *App) InitMongodb(ctx context.Context) error {
-	b := initropts.Mongodb().SetUri(*app.Config.Mongodb.Uri)
+	b := initropts.Mongodb().SetUri(*app.config.Mongodb.Uri)
 	shell, err := initr.Mongodb(ctx, b)
 	if err != nil {
 		return err
 	}
-	shell.Db = shell.Client.Database(app.Config.Mongodb.DbName)
+	shell.Db = shell.Client.Database(app.config.Mongodb.DbName)
 	app.MongodbShell = shell
 	return nil
-}
-
-func (app *App) MustInitMongodb(ctx context.Context) {
-	app.MustInit(ctx, app.InitMongodb)
 }
 
 func (app *App) InitPrometheus(ctx context.Context) error {
@@ -55,10 +56,6 @@ func (app *App) InitPrometheus(ctx context.Context) error {
 	}
 	app.PrometheusShell = shell
 	return nil
-}
-
-func (app *App) MustInitPrometheus(ctx context.Context) {
-	app.MustInit(ctx, app.InitPrometheus)
 }
 
 func (app *App) MustInit(ctx context.Context, f func(context.Context) error) {
@@ -72,16 +69,16 @@ func (app *App) InitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder)
 	if opts == nil {
 		opts = initropts.GrpcServer()
 	}
-	if app.Config.Grpc.UseLogging {
+	if app.config.Grpc.UseLogging {
 		opts.SetLogging(app.Logger())
 	}
-	if app.Config.Grpc.UseReflection {
+	if app.config.Grpc.UseReflection {
 		opts.WithReflection()
 	}
-	if app.Config.Grpc.UseHealthCheck {
+	if app.config.Grpc.UseHealthCheck {
 		opts.WithHealthCheck()
 	}
-	if app.Config.Prometheus.Enabled {
+	if app.config.Prometheus.Enabled {
 		opts.SetPrometheus(app.PrometheusShell.Registry)
 	}
 
@@ -107,8 +104,4 @@ func (app *App) InitZap(ctx context.Context) error {
 	}
 	app.LoggerShell = shell
 	return nil
-}
-
-func (app *App) MustInitZap(ctx context.Context) {
-	app.MustInit(ctx, app.InitZap)
 }

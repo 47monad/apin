@@ -1,0 +1,4 @@
+amends "https://raw.githubusercontent.com/47monad/sercon/main/pkl/ServiceConfig.pkl"
+
+name = "TestWriterApp"
+version = "0.1.1"

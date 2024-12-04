@@ -2,18 +2,19 @@ package runner
 
 import (
 	"context"
+	"net"
+	"strconv"
+	"time"
+
 	"github.com/47monad/apin/internal/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
-	"net"
-	"strconv"
-	"time"
 )
 
 func (r *Runner) AddGrpcServer(srv *grpc.Server) {
 	r.eg.Go(func() error {
-		port := r.app.Config.Grpc.Port
+		port := r.app.GetConfig().Grpc.Port
 		r.app.Logger().Info("starting grpc server", logger.LogFields{"port": port})
 		return serveOnPort(srv, port)
 	})
