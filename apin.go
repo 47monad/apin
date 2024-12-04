@@ -58,8 +58,7 @@ func (app *App) InitPrometheus(ctx context.Context) error {
 	return nil
 }
 
-func (app *App) MustInit(ctx context.Context, f func(context.Context) error) {
-	err := f(ctx)
+func (app *App) Must(err error) {
 	if err != nil {
 		panic(err)
 	}
