@@ -9,9 +9,11 @@ import (
 
 func TestLoad(t *testing.T) {
 	// act
-	app, err := apin.Load(apin.WithAppDir("writer"))
+	app, err := apin.InitWithZaal("./config/writer/main.cue", "./config/writer/.env")
 
 	// assert
 	assert.NoError(t, err)
-	assert.Equal(t, app.GetConfig().Name, "TestWriterApp")
+	assert.Equal(t, app.GetConfig().HTTP.Port, 8888)
+	assert.Equal(t, app.GetConfig().GRPC.Port, 9999)
+	assert.True(t, app.GetConfig().GRPC.Features.Logging)
 }

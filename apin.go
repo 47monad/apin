@@ -6,12 +6,12 @@ import (
 	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
 	"github.com/47monad/apin/internal/logger"
-	"github.com/47monad/sercon"
+	"github.com/47monad/zaal"
 )
 
 type App struct {
 	LoggerShell     *initr.LoggerShell
-	config          *sercon.Config
+	config          *zaal.Config
 	MongodbShell    *initr.MongodbShell
 	PrometheusShell *initr.PrometheusShell
 	GrpcServerShell *initr.GrpcServerShell
@@ -21,7 +21,7 @@ func (app *App) GetName() string {
 	return app.config.Name
 }
 
-func (app *App) GetConfig() *sercon.Config {
+func (app *App) GetConfig() *zaal.Config {
 	return app.config
 }
 
@@ -29,7 +29,7 @@ func (app *App) Logger() logger.Logger {
 	return app.LoggerShell.Logger
 }
 
-func FromConfig(config *sercon.Config) *App {
+func FromConfig(config *zaal.Config) *App {
 	app := &App{
 		config: config,
 	}
@@ -38,7 +38,7 @@ func FromConfig(config *sercon.Config) *App {
 }
 
 func (app *App) InitMongodb(ctx context.Context) error {
-	b := initropts.Mongodb().SetUri(*app.config.Mongodb.Uri)
+	b := initropts.Mongodb().SetUri(app.config.Mongodb.URI)
 	shell, err := initr.Mongodb(ctx, b)
 	if err != nil {
 		return err
@@ -68,16 +68,16 @@ func (app *App) InitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder)
 	if opts == nil {
 		opts = initropts.GrpcServer()
 	}
-	if app.config.Grpc.UseLogging {
+	if app.config.GRPC.Features.Logging {
 		opts.SetLogging(app.Logger())
 	}
-	if app.config.Grpc.UseReflection {
+	if app.config.GRPC.Features.Reflection {
 		opts.WithReflection()
 	}
-	if app.config.Grpc.UseHealthCheck {
+	if app.config.GRPC.Features.HealthCheck {
 		opts.WithHealthCheck()
 	}
-	if app.config.Prometheus.Enabled {
+	if app.config.Prometheus != nil {
 		opts.SetPrometheus(app.PrometheusShell.Registry)
 	}
 

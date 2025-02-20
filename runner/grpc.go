@@ -14,7 +14,7 @@ import (
 
 func (r *Runner) AddGrpcServer(srv *grpc.Server) {
 	r.eg.Go(func() error {
-		port := r.app.GetConfig().Grpc.Port
+		port := r.app.GetConfig().GRPC.Port
 		r.app.Logger().Info("starting grpc server", logger.LogFields{"port": port})
 		return serveOnPort(srv, port)
 	})
@@ -37,8 +37,8 @@ func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, check
 	})
 }
 
-func serveOnPort(srv *grpc.Server, port uint16) error {
-	lis, err := net.Listen("tcp", ":"+strconv.Itoa(int(port)))
+func serveOnPort(srv *grpc.Server, port int) error {
+	lis, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		return err
 	}

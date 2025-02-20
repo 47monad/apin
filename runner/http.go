@@ -8,8 +8,8 @@ import (
 )
 
 func (r *Runner) AddHttp(attacher func(*http.ServeMux)) {
-	port := r.app.GetConfig().Ports["http"]
-	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(int(port))}
+	port := r.app.GetConfig().HTTP.Port
+	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(port)}
 	r.eg.Go(func() error {
 		r.app.Logger().Info("starting http server", logger.LogFields{"port": port})
 		m := http.NewServeMux()
