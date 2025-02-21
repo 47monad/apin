@@ -3,7 +3,7 @@ module github.com/47monad/apin
 go 1.22.3
 
 require (
-	github.com/47monad/zaal v0.0.11-0.20250220012316-5fecb4bd0f1a
+	github.com/47monad/zaal v0.1.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/prometheus/client_golang v1.20.4
