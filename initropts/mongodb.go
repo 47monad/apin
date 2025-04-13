@@ -7,7 +7,7 @@ import (
 )
 
 type MongodbStore struct {
-	Opts *options.ClientOptionsBuilder
+	Opts *options.ClientOptions
 }
 
 type MongodbBuilder struct {
