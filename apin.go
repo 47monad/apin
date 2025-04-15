@@ -100,7 +100,8 @@ func (app *App) InitZap(ctx context.Context) error {
 }
 
 func (app *App) InitRabbitMQ(ctx context.Context) error {
-	shell, err := initr.RabbitMQ(ctx, initropts.RabbitMQ())
+	b := initropts.RabbitMQ().SetUri(app.config.RabbiMQ.URI)
+	shell, err := initr.RabbitMQ(ctx, b)
 	if err != nil {
 		return err
 	}
