@@ -13,7 +13,7 @@ func TestLoad(t *testing.T) {
 
 	// assert
 	assert.NoError(t, err)
-	assert.Equal(t, app.GetConfig().HTTP.Port, 8888)
-	assert.Equal(t, app.GetConfig().GRPC.Port, 9999)
-	assert.True(t, app.GetConfig().GRPC.Features.Logging)
+	assert.Equal(t, app.GetConfig().HTTP.Servers["main"].Port, 8888)
+	assert.Equal(t, app.GetConfig().GRPC.Servers["main"].Port, 9999)
+	assert.True(t, app.GetConfig().GRPC.Servers["main"].Features.Logging)
 }

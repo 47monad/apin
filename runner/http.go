@@ -5,10 +5,11 @@ import (
 	"strconv"
 
 	"github.com/47monad/apin/internal/logger"
+	"github.com/47monad/zaal"
 )
 
-func (r *Runner) AddHttp(attacher func(*http.ServeMux)) {
-	port := r.app.GetConfig().HTTP.Port
+func (r *Runner) AddHttp(server *zaal.HTTPServerConfig, attacher func(*http.ServeMux)) {
+	port := server.Port
 	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(port)}
 	r.eg.Go(func() error {
 		r.app.Logger().Info("starting http server", logger.LogFields{"port": port})

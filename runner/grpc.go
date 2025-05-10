@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/47monad/apin/internal/logger"
+	"github.com/47monad/zaal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
-func (r *Runner) AddGrpcServer(srv *grpc.Server) {
+func (r *Runner) AddGrpcServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) {
 	r.eg.Go(func() error {
-		port := r.app.GetConfig().GRPC.Port
+		port := serverConfig.Port
 		r.app.Logger().Info("starting grpc server", logger.LogFields{"port": port})
 		return serveOnPort(srv, port)
 	})

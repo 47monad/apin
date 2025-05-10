@@ -65,17 +65,18 @@ func Must(err error) {
 	}
 }
 
-func (app *App) InitGrpc(ctx context.Context, opts *initropts.GrpcServerBuilder) error {
+func (app *App) InitGrpc(ctx context.Context, name string, opts *initropts.GrpcServerBuilder) error {
 	if opts == nil {
 		opts = initropts.GrpcServer()
 	}
-	if app.config.GRPC.Features.Logging {
+	server := app.config.GRPC.Servers[name]
+	if server.Features.Logging {
 		opts.SetLogging(app.Logger())
 	}
-	if app.config.GRPC.Features.Reflection {
+	if server.Features.Reflection {
 		opts.WithReflection()
 	}
-	if app.config.GRPC.Features.HealthCheck {
+	if server.Features.HealthCheck {
 		opts.WithHealthCheck()
 	}
 	if app.config.Prometheus != nil {

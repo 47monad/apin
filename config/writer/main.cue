@@ -1,10 +1,18 @@
 service: {
   http: {
-    port: 8888
+    servers: {
+      main: {
+        port: 8888
+      }
+    }
   }
   grpc: {
-    features: {
-      logging: true
+    servers: {
+      main: {
+        features: {
+          logging: true
+        }
+      }
     }
   }
 }
