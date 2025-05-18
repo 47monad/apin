@@ -5,8 +5,8 @@ import (
 
 	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
-	"github.com/47monad/apin/internal/logger"
 	"github.com/47monad/zaal"
+	"github.com/go-logr/logr"
 )
 
 type App struct {
@@ -26,7 +26,7 @@ func (app *App) GetConfig() *zaal.Config {
 	return app.config
 }
 
-func (app *App) Logger() logger.Logger {
+func (app *App) Logger() logr.Logger {
 	return app.LoggerShell.Logger
 }
 

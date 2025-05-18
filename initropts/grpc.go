@@ -2,7 +2,7 @@ package initropts
 
 import (
 	"github.com/47monad/apin/internal/grpcutil"
-	"github.com/47monad/apin/internal/logger"
+	"github.com/go-logr/logr"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -62,13 +62,14 @@ func (b *GrpcServerBuilder) SetPrometheus(reg *prometheus.Registry) *GrpcServerB
 	return b
 }
 
-func (b *GrpcServerBuilder) SetLogging(l logger.Logger) *GrpcServerBuilder {
+func (b *GrpcServerBuilder) SetLogging(l logr.Logger) *GrpcServerBuilder {
 	b.Opts = append(b.Opts, func(b *GrpcServerStore) error {
 		b.Interceptors = append(b.Interceptors, grpcutil.NewLoggingInterceptor(l))
 		return nil
 	})
 	return b
 }
+
 func (b *GrpcServerBuilder) WithReflection() *GrpcServerBuilder {
 	b.Opts = append(b.Opts, func(s *GrpcServerStore) error {
 		s.Reflection = true

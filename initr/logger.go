@@ -1,8 +1,9 @@
 package initr
 
-import "github.com/47monad/apin/internal/logger"
+import (
+	"github.com/go-logr/logr"
+)
 
 type LoggerShell struct {
-	Logger logger.Logger
-	Driver logger.LogDriver
+	Logger logr.Logger
 }
