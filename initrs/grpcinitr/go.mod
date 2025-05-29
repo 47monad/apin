@@ -6,6 +6,7 @@ replace github.com/47monad/apin => ../..
 
 require (
 	github.com/47monad/apin v0.0.0-00010101000000-000000000000
+	github.com/go-logr/logr v1.4.2
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/prometheus/client_golang v1.22.0
 	google.golang.org/grpc v1.72.0
@@ -14,6 +15,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
