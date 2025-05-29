@@ -64,7 +64,7 @@ func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
 	return &Shell{Client: client}, nil
 }
 
-func (shell *Shell) Shutdown(ctx context.Context) error {
+func (shell *Shell) Close(ctx context.Context) error {
 	if shell.Client == nil {
 		return nil
 	}
