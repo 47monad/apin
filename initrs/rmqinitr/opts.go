@@ -1,7 +1,11 @@
 package rmqinitr
 
+import "time"
+
 type Store struct {
-	URI string
+	URI              string
+	MaxRetryInterval time.Duration
+	MinRetryInterval time.Duration
 }
 
 type Builder struct {

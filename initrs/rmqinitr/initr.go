@@ -2,53 +2,36 @@ package rmqinitr
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
-	"github.com/rabbitmq/amqp091-go"
 )
 
-type Shell struct {
-	Conn    *amqp091.Connection
-	Channel *amqp091.Channel
+func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
+	shell, err := _init(ctx, b)
+	if err != nil {
+		panic(err)
+	}
+	return shell
 }
 
-var RabbitMQ = initr.AgentFunc[*Store, *Shell](initRabbitMQ)
+func New(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+	return _init(ctx, b)
+}
 
-func initRabbitMQ(_ context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
 	store, err := b.Build()
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := amqp091.Dial(store.URI)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to rabbitmq server: %v", err)
+	mgr := &Shell{
+		stopChan: make(chan struct{}),
+		healthy:  false,
+		closed:   false,
+		store:    store,
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create channel: %v", err)
-	}
-
-	return &Shell{Conn: conn, Channel: ch}, nil
-}
-
-func (shell *Shell) Dispose(ctx context.Context) error {
-	if shell.Channel != nil {
-		err := shell.Channel.Close()
-		if err != nil {
-			return fmt.Errorf("failed to close channel")
-		}
-	}
-
-	if shell.Conn == nil {
-		return nil
-	}
-	err := shell.Conn.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close connection: %v", err)
-	}
-	return nil
+	mgr.wg.Add(1)
+	go mgr.reconnectLoop()
+	return mgr, nil
 }
