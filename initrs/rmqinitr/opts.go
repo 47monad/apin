@@ -28,9 +28,25 @@ func (b *Builder) Build() (*Store, error) {
 	return store, nil
 }
 
-func (b *Builder) SetUri(uri string) *Builder {
+func (b *Builder) SetURI(uri string) *Builder {
 	b.Opts = append(b.Opts, func(o *Store) error {
 		o.URI = uri
+		return nil
+	})
+	return b
+}
+
+func (b *Builder) SetMinRetryInterval(interval time.Duration) *Builder {
+	b.Opts = append(b.Opts, func(o *Store) error {
+		o.MinRetryInterval = interval
+		return nil
+	})
+	return b
+}
+
+func (b *Builder) SetMaxRetryInterval(interval time.Duration) *Builder {
+	b.Opts = append(b.Opts, func(o *Store) error {
+		o.MaxRetryInterval = interval
 		return nil
 	})
 	return b

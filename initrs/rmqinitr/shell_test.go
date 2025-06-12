@@ -1,321 +1,322 @@
 package rmqinitr_test
 
-// import (
-// 	"context"
-// 	"fmt"
-// 	"log"
-// 	"os"
-// 	"testing"
-// 	"time"
-//
-// 	"github.com/ory/dockertest/v3"
-// 	"github.com/ory/dockertest/v3/docker"
-// 	amqp "github.com/rabbitmq/amqp091-go"
-// 	"github.com/stretchr/testify/assert"
-// 	"github.com/stretchr/testify/require"
-//
-// 	"github.com/47monad/apin/initrs/rmqinitr" // Replace with your actual module path
-// )
-//
-// var (
-// 	rabbitmqURL string
-// 	pool        *dockertest.Pool
-// 	resource    *dockertest.Resource
-// )
-//
-// func TestMain(m *testing.M) {
-// 	var err error
-// 	pool, err = dockertest.NewPool("")
-// 	if err != nil {
-// 		log.Fatalf("Could not connect to docker: %s", err)
-// 	}
-//
-// 	// Start RabbitMQ container
-// 	resource, err = pool.RunWithOptions(&dockertest.RunOptions{
-// 		Repository: "rabbitmq",
-// 		Tag:        "3.12-management-alpine",
-// 		Env: []string{
-// 			"RABBITMQ_DEFAULT_USER=test",
-// 			"RABBITMQ_DEFAULT_PASS=test",
-// 		},
-// 	}, func(config *docker.HostConfig) {
-// 		config.AutoRemove = true
-// 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-// 	})
-// 	if err != nil {
-// 		log.Fatalf("Could not start resource: %s", err)
-// 	}
-//
-// 	hostAndPort := resource.GetHostPort("5672/tcp")
-// 	rabbitmqURL = fmt.Sprintf("amqp://test:test@%s/", hostAndPort)
-//
-// 	// Wait for RabbitMQ to be ready
-// 	pool.MaxWait = 120 * time.Second
-// 	if err = pool.Retry(func() error {
-// 		conn, err := amqp.Dial(rabbitmqURL)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return conn.Close()
-// 	}); err != nil {
-// 		log.Fatalf("Could not connect to RabbitMQ: %s", err)
-// 	}
-//
-// 	code := m.Run()
-//
-// 	if err := pool.Purge(resource); err != nil {
-// 		log.Fatalf("Could not purge resource: %s", err)
-// 	}
-//
-// 	os.Exit(code)
-// }
-//
-// func TestNewRabbitManager_ValidConnection(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-// 	defer mgr.Close()
-//
-// 	// Wait for connection to establish
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	require.NoError(t, err)
-//
-// 	assert.True(t, mgr.IsHealthy())
-// }
-//
-// func TestNewRabbitManager_InvalidConnection(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager("amqp://invalid:invalid@localhost:9999/", &rmqinitr.Config{
-// 		MaxRetryInterval: 1 * time.Second,
-// 		MinRetryInterval: 100 * time.Millisecond,
-// 	})
-// 	defer mgr.Close()
-//
-// 	// Should not become healthy with invalid connection
-// 	time.Sleep(2 * time.Second)
-// 	assert.False(t, mgr.IsHealthy())
-// }
-//
-// func TestGetChannel_WhenHealthy(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-// 	defer mgr.Close()
-//
-// 	// Wait for connection
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	require.NoError(t, err)
-//
-// 	// Should be able to get channel
-// 	ch, err := mgr.GetChannel()
-// 	assert.NoError(t, err)
-// 	assert.NotNil(t, ch)
-// }
-//
-// func TestGetChannel_WhenUnhealthy(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager("amqp://invalid:invalid@localhost:9999/", &rmqinitr.Config{
-// 		MaxRetryInterval: 1 * time.Second,
-// 		MinRetryInterval: 100 * time.Millisecond,
-// 	})
-// 	defer mgr.Close()
-//
-// 	// Should not be able to get channel when unhealthy
-// 	ch, err := mgr.GetChannel()
-// 	assert.Error(t, err)
-// 	assert.Nil(t, ch)
-// 	assert.Equal(t, rmqinitr.ErrNotHealthy, err)
-// }
-//
-// func TestGetChannel_AfterClose(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-//
-// 	// Wait for connection
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	require.NoError(t, err)
-//
-// 	// Close manager
-// 	err = mgr.Close()
-// 	require.NoError(t, err)
-//
-// 	// Should not be able to get channel after close
-// 	ch, err := mgr.GetChannel()
-// 	assert.Error(t, err)
-// 	assert.Nil(t, ch)
-// 	assert.Equal(t, rmqinitr.ErrManagerClosed, err)
-// }
-//
-// func TestReconnection_AfterConnectionLoss(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, &rmqinitr.Config{
-// 		MaxRetryInterval: 2 * time.Second,
-// 		MinRetryInterval: 100 * time.Millisecond,
-// 	})
-// 	defer mgr.Close()
-//
-// 	// Wait for initial connection
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	require.NoError(t, err)
-//
-// 	// Stop and restart RabbitMQ container to simulate connection loss
-// 	err = pool.Purge(resource)
-// 	require.NoError(t, err)
-//
-// 	// Wait for unhealthy state
-// 	time.Sleep(1 * time.Second)
-// 	assert.False(t, mgr.IsHealthy())
-//
-// 	// Restart RabbitMQ
-// 	resource, err = pool.RunWithOptions(&dockertest.RunOptions{
-// 		Repository: "rabbitmq",
-// 		Tag:        "3.12-management-alpine",
-// 		Env: []string{
-// 			"RABBITMQ_DEFAULT_USER=test",
-// 			"RABBITMQ_DEFAULT_PASS=test",
-// 		},
-// 	}, func(config *docker.HostConfig) {
-// 		config.AutoRemove = true
-// 		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-// 	})
-// 	require.NoError(t, err)
-//
-// 	// Wait for RabbitMQ to be ready again
-// 	pool.MaxWait = 60 * time.Second
-// 	err = pool.Retry(func() error {
-// 		conn, err := amqp.Dial(rabbitmqURL)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return conn.Close()
-// 	})
-// 	require.NoError(t, err)
-//
-// 	// Should reconnect automatically
-// 	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
-// 	defer cancel2()
-//
-// 	err = mgr.WaitForHealth(ctx2)
-// 	assert.NoError(t, err)
-// 	assert.True(t, mgr.IsHealthy())
-// }
-//
-// func TestConcurrentAccess(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-// 	defer mgr.Close()
-//
-// 	// Wait for connection
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	require.NoError(t, err)
-//
-// 	// Test concurrent access to GetChannel and IsHealthy
-// 	done := make(chan bool)
-// 	errors := make(chan error, 100)
-//
-// 	// Multiple goroutines accessing GetChannel
-// 	for i := 0; i < 10; i++ {
-// 		go func() {
-// 			defer func() { done <- true }()
-// 			for j := 0; j < 10; j++ {
-// 				ch, err := mgr.GetChannel()
-// 				if err != nil {
-// 					errors <- err
-// 					return
-// 				}
-// 				if ch == nil {
-// 					errors <- fmt.Errorf("got nil channel")
-// 					return
-// 				}
-// 				time.Sleep(10 * time.Millisecond)
-// 			}
-// 		}()
-// 	}
-//
-// 	// Multiple goroutines checking health
-// 	for i := 0; i < 5; i++ {
-// 		go func() {
-// 			defer func() { done <- true }()
-// 			for j := 0; j < 20; j++ {
-// 				mgr.IsHealthy()
-// 				time.Sleep(5 * time.Millisecond)
-// 			}
-// 		}()
-// 	}
-//
-// 	// Wait for all goroutines
-// 	for i := 0; i < 15; i++ {
-// 		<-done
-// 	}
-//
-// 	// Check for any errors
-// 	select {
-// 	case err := <-errors:
-// 		t.Fatalf("Concurrent access error: %v", err)
-// 	default:
-// 		// No errors, test passed
-// 	}
-// }
-//
-// func TestWaitForHealth_Timeout(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager("amqp://invalid:invalid@localhost:9999/", &rmqinitr.Config{
-// 		MaxRetryInterval: 5 * time.Second,
-// 		MinRetryInterval: 1 * time.Second,
-// 	})
-// 	defer mgr.Close()
-//
-// 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	assert.Error(t, err)
-// 	assert.Equal(t, context.DeadlineExceeded, err)
-// }
-//
-// func TestWaitForHealth_Success(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-// 	defer mgr.Close()
-//
-// 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-// 	defer cancel()
-//
-// 	err := mgr.WaitForHealth(ctx)
-// 	assert.NoError(t, err)
-// }
-//
-// func TestClose_MultipleCallsSafe(t *testing.T) {
-// 	mgr := rmqinitr.NewRabbitManager(rabbitmqURL, nil)
-//
-// 	// Multiple close calls should be safe
-// 	err1 := mgr.Close()
-// 	err2 := mgr.Close()
-// 	err3 := mgr.Close()
-//
-// 	assert.NoError(t, err1)
-// 	assert.NoError(t, err2)
-// 	assert.NoError(t, err3)
-// }
-//
-// func TestExponentialBackoff(t *testing.T) {
-// 	// This test verifies that retry intervals increase (indirectly)
-// 	start := time.Now()
-//
-// 	mgr := rmqinitr.NewRabbitManager("amqp://invalid:invalid@localhost:9999/", &rmqinitr.Config{
-// 		MaxRetryInterval: 4 * time.Second,
-// 		MinRetryInterval: 100 * time.Millisecond,
-// 	})
-// 	defer mgr.Close()
-//
-// 	// Wait a bit to let several retry attempts happen
-// 	time.Sleep(8 * time.Second)
-//
-// 	// Should still be unhealthy but should have taken some time due to backoff
-// 	assert.False(t, mgr.IsHealthy())
-// 	assert.True(t, time.Since(start) >= 8*time.Second)
-// }
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"testing"
+	"time"
+
+	"github.com/47monad/apin/initrs/rmqinitr" // Replace with your actual module path
+	"github.com/47monad/zaal"
+	dockerContainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	rmqtc "github.com/testcontainers/testcontainers-go/modules/rabbitmq"
+)
+
+var (
+	rabbitmqURI string
+	container   *rmqtc.RabbitMQContainer
+)
+
+func TestMain(m *testing.M) {
+	var err error
+	ctx := context.Background()
+
+	// Run rabbitmq container
+	container, err = rmqtc.Run(ctx,
+		"rabbitmq:4.1.1-management-alpine",
+		testcontainers.WithExposedPorts("56720"),
+		testcontainers.WithReuseByName("rmq-apin-client"),
+		testcontainers.WithHostConfigModifier(func(hostConfig *dockerContainer.HostConfig) {
+			hostConfig.PortBindings = nat.PortMap{
+				rmqtc.DefaultAMQPPort: {{HostIP: "0.0.0.0", HostPort: "56720"}},
+				rmqtc.DefaultHTTPPort: {{HostIP: "0.0.0.0", HostPort: "51672"}},
+			}
+		}),
+	)
+	if err != nil {
+		log.Fatalf("could not run rabbitmq container: %s", err)
+	}
+
+	rabbitmqURI, err = container.AmqpURL(ctx)
+	if err != nil {
+		log.Fatalf("could not get amqp URI: %s", err)
+	}
+
+	code := m.Run()
+
+	if err = container.Terminate(context.Background()); err != nil {
+		log.Fatalf("Could not terminate rabbitmq container: %s", err)
+	}
+
+	os.Exit(code)
+}
+
+func TestNewFromConfig_ValidConnection(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{URI: rabbitmqURI})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Wait for connection to establish
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	require.NoError(t, err)
+
+	assert.True(t, shell.IsHealthy())
+}
+
+func TestNewRabbitManager_InvalidConnection(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: "amqp://invalid:invalid@localhost:9999/",
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Should not become healthy with invalid connection
+	time.Sleep(2 * time.Second)
+	assert.False(t, shell.IsHealthy())
+}
+
+func TestGetChannel_WhenHealthy(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: rabbitmqURI,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Wait for connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	require.NoError(t, err)
+
+	// Should be able to get channel
+	ch, err := shell.GetChannel()
+	assert.NoError(t, err)
+	assert.NotNil(t, ch)
+}
+
+func TestGetChannel_WhenUnhealthy(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI:              "amqp://invalid:invalid@localhost:9999/",
+		MinRetryInterval: 1,
+		MaxRetryInterval: 2,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Should not be able to get channel when unhealthy
+	ch, err := shell.GetChannel()
+	assert.Error(t, err)
+	assert.Nil(t, ch)
+	assert.Equal(t, rmqinitr.ErrNotHealthy, err)
+}
+
+func TestGetChannel_AfterClose(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: rabbitmqURI,
+	})
+	require.NoError(t, err)
+
+	// Wait for connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	require.NoError(t, err)
+
+	// Close manager
+	err = shell.Close(context.Background())
+	require.NoError(t, err)
+
+	// Should not be able to get channel after close
+	ch, err := shell.GetChannel()
+	assert.Error(t, err)
+	assert.Nil(t, ch)
+	assert.Equal(t, rmqinitr.ErrShellClosed, err)
+}
+
+func TestReconnection_AfterConnectionLoss(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI:              rabbitmqURI,
+		MaxRetryInterval: 4,
+		MinRetryInterval: 1,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Wait for initial connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	require.NoError(t, err)
+
+	// Stop and restart RabbitMQ container to simulate connection loss
+	err = runCommand("docker", "stop", container.GetContainerID())
+	// err = container.Terminate(context.Background())
+	require.NoError(t, err)
+
+	// Wait for unhealthy state
+	time.Sleep(2 * time.Second)
+	assert.False(t, shell.IsHealthy())
+
+	// Restart RabbitMQ
+	err = runCommand("docker", "start", container.GetContainerID())
+	require.NoError(t, err)
+
+	// Should reconnect automatically
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+
+	err = shell.WaitForHealth(ctx2)
+	assert.NoError(t, err)
+	assert.True(t, shell.IsHealthy())
+}
+
+func TestConcurrentAccess(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: rabbitmqURI,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Wait for connection
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	require.NoError(t, err)
+
+	// Test concurrent access to GetChannel and IsHealthy
+	done := make(chan bool)
+	errors := make(chan error, 100)
+
+	// Multiple goroutines accessing GetChannel
+	for range 10 {
+		go func() {
+			defer func() { done <- true }()
+			for range 10 {
+				ch, err := shell.GetChannel()
+				if err != nil {
+					errors <- err
+					return
+				}
+				if ch == nil {
+					errors <- fmt.Errorf("got nil channel")
+					return
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		}()
+	}
+
+	// Multiple goroutines checking health
+	for range 5 {
+		go func() {
+			defer func() { done <- true }()
+			for range 20 {
+				shell.IsHealthy()
+				time.Sleep(5 * time.Millisecond)
+			}
+		}()
+	}
+
+	// Wait for all goroutines
+	for range 15 {
+		<-done
+	}
+
+	// Check for any errors
+	select {
+	case err := <-errors:
+		t.Fatalf("Concurrent access error: %v", err)
+	default:
+		// No errors, test passed
+	}
+}
+
+func TestWaitForHealth_Timeout(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI:              "amqp://invalid:invalid@localhost:9999/",
+		MaxRetryInterval: 5,
+		MinRetryInterval: 1,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	assert.Error(t, err)
+	assert.Equal(t, context.DeadlineExceeded, err)
+}
+
+func TestWaitForHealth_Success(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: rabbitmqURI,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = shell.WaitForHealth(ctx)
+	assert.NoError(t, err)
+}
+
+func TestClose_MultipleCallsSafe(t *testing.T) {
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI: rabbitmqURI,
+	})
+	require.NoError(t, err)
+
+	// Multiple close calls should be safe
+	err1 := shell.Close(context.Background())
+	err2 := shell.Close(context.Background())
+	err3 := shell.Close(context.Background())
+
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
+	assert.NoError(t, err3)
+}
+
+func TestExponentialBackoff(t *testing.T) {
+	// This test verifies that retry intervals increase (indirectly)
+	start := time.Now()
+
+	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
+		URI:              "amqp://invalid:invalid@localhost:9999/",
+		MaxRetryInterval: 4,
+		MinRetryInterval: 1,
+	})
+	require.NoError(t, err)
+	defer shell.Close(context.Background())
+
+	// Wait a bit to let several retry attempts happen
+	time.Sleep(8 * time.Second)
+
+	// Should still be unhealthy but should have taken some time due to backoff
+	assert.False(t, shell.IsHealthy())
+	assert.True(t, time.Since(start) >= 8*time.Second)
+}
+
+func runCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	_, err := cmd.CombinedOutput()
+	if err != nil {
+		return err
+	}
+	return nil
+}
