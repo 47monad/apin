@@ -15,7 +15,6 @@ type App struct {
 	MongodbShell    *initr.MongodbShell
 	PrometheusShell *initr.PrometheusShell
 	GrpcServerShell *initr.GrpcServerShell
-	RabbitMQShell   *initr.RabbitMQShell
 }
 
 func (app *App) GetName() string {
@@ -97,15 +96,5 @@ func (app *App) InitZap(ctx context.Context) error {
 		return err
 	}
 	app.LoggerShell = shell
-	return nil
-}
-
-func (app *App) InitRabbitMQ(ctx context.Context) error {
-	b := initropts.RabbitMQ().SetUri(app.config.RabbiMQ.URI)
-	shell, err := initr.RabbitMQ(ctx, b)
-	if err != nil {
-		return err
-	}
-	app.RabbitMQShell = shell
 	return nil
 }
