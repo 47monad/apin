@@ -3,8 +3,8 @@ package prominitr
 import (
 	"context"
 
-	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
+	"github.com/47monad/zaal"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -12,17 +12,33 @@ type Shell struct {
 	Registry *prometheus.Registry
 }
 
-var Prometheus = initr.AgentFunc[*Store, *Shell](initPrometheus)
-
-func EnsurePrometheus(ctx context.Context, b initropts.Builder[*Store]) *Shell {
-	shell, err := initPrometheus(ctx, b)
+func MustNewFromConfig(ctx context.Context, config *zaal.PrometheusConfig) *Shell {
+	shell, err := NewFromConfig(ctx, config)
 	if err != nil {
 		panic(err)
 	}
 	return shell
 }
 
-func initPrometheus(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func NewFromConfig(ctx context.Context, config *zaal.PrometheusConfig) (*Shell, error) {
+	opts := Opts()
+	// TODO: enable grpc metrics here
+	return _init(ctx, opts)
+}
+
+func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
+	shell, err := _init(ctx, b)
+	if err != nil {
+		panic(err)
+	}
+	return shell
+}
+
+func New(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+	return _init(ctx, b)
+}
+
+func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
 	_, err := b.Build()
 	if err != nil {
 		return nil, err
