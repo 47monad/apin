@@ -13,7 +13,6 @@ type App struct {
 	LoggerShell     *initr.LoggerShell
 	config          *zaal.Config
 	MongodbShell    *initr.MongodbShell
-	PrometheusShell *initr.PrometheusShell
 	GrpcServerShell *initr.GrpcServerShell
 }
 
@@ -48,16 +47,6 @@ func (app *App) InitMongodb(ctx context.Context) error {
 	return nil
 }
 
-func (app *App) InitPrometheus(ctx context.Context) error {
-	b := initropts.Prometheus()
-	shell, err := initr.Prometheus(ctx, b)
-	if err != nil {
-		return err
-	}
-	app.PrometheusShell = shell
-	return nil
-}
-
 func Must(err error) {
 	if err != nil {
 		panic(err)
@@ -77,9 +66,6 @@ func (app *App) InitGrpc(ctx context.Context, name string, opts *initropts.GrpcS
 	}
 	if server.Features.HealthCheck {
 		opts.WithHealthCheck()
-	}
-	if app.config.Prometheus != nil {
-		opts.SetPrometheus(app.PrometheusShell.Registry)
 	}
 
 	shell, err := initr.GrpcServer(ctx, opts)
