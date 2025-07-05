@@ -12,7 +12,6 @@ import (
 type App struct {
 	LoggerShell     *initr.LoggerShell
 	config          *zaal.Config
-	MongodbShell    *initr.MongodbShell
 	GrpcServerShell *initr.GrpcServerShell
 }
 
@@ -34,17 +33,6 @@ func FromConfig(config *zaal.Config) *App {
 	}
 
 	return app
-}
-
-func (app *App) InitMongodb(ctx context.Context) error {
-	b := initropts.Mongodb().SetUri(app.config.Mongodb.URI)
-	shell, err := initr.Mongodb(ctx, b)
-	if err != nil {
-		return err
-	}
-	shell.Db = shell.Client.Database(app.config.Mongodb.DbName)
-	app.MongodbShell = shell
-	return nil
 }
 
 func Must(err error) {
