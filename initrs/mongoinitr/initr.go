@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/47monad/apin/initr"
 	"github.com/47monad/apin/initropts"
+	"github.com/47monad/zaal"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
@@ -15,17 +15,36 @@ type Shell struct {
 	Db     *mongo.Database
 }
 
-var Mongodb = initr.AgentFunc[*Store, *Shell](initMongodb)
-
-func EnsureMongodb(ctx context.Context, b initropts.Builder[*Store]) *Shell {
-	shell, err := initMongodb(ctx, b)
+func MustNewFromConfig(ctx context.Context, config *zaal.MongodbConfig) *Shell {
+	shell, err := NewFromConfig(ctx, config)
 	if err != nil {
 		panic(err)
 	}
 	return shell
 }
 
-func initMongodb(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func NewFromConfig(ctx context.Context, config *zaal.MongodbConfig) (*Shell, error) {
+	b := Opts()
+	b.SetURI(config.URI)
+	if config.DbName != "" {
+		b.SetDBName(config.DbName)
+	}
+	return _init(ctx, b)
+}
+
+func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
+	shell, err := _init(ctx, b)
+	if err != nil {
+		panic(err)
+	}
+	return shell
+}
+
+func New(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+	return _init(ctx, b)
+}
+
+func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
 	store, err := b.Build()
 	if err != nil {
 		return nil, err
@@ -43,10 +62,15 @@ func initMongodb(ctx context.Context, b initropts.Builder[*Store]) (*Shell, erro
 		return nil, fmt.Errorf("problem pinging database: %v", err)
 	}
 
-	return &Shell{Client: client}, nil
+	shell := &Shell{Client: client}
+	if store.DBName != "" {
+		shell.Db = client.Database(store.DBName)
+	}
+
+	return shell, nil
 }
 
-func (shell *Shell) Shutdown(ctx context.Context) error {
+func (shell *Shell) Close(ctx context.Context) error {
 	if shell.Client == nil {
 		return nil
 	}

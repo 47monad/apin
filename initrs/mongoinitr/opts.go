@@ -7,7 +7,8 @@ import (
 )
 
 type Store struct {
-	Opts *options.ClientOptions
+	Opts   *options.ClientOptions
+	DBName string
 }
 
 type Builder struct {
@@ -43,6 +44,14 @@ func (b *Builder) SetURI(uri string) *Builder {
 func (b *Builder) SetTimeout(d time.Duration) *Builder {
 	b.Opts = append(b.Opts, func(o *Store) error {
 		o.Opts.SetConnectTimeout(d)
+		return nil
+	})
+	return b
+}
+
+func (b *Builder) SetDBName(name string) *Builder {
+	b.Opts = append(b.Opts, func(o *Store) error {
+		o.DBName = name
 		return nil
 	})
 	return b
