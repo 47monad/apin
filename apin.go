@@ -10,9 +10,8 @@ import (
 )
 
 type App struct {
-	LoggerShell     *initr.LoggerShell
-	config          *zaal.Config
-	GrpcServerShell *initr.GrpcServerShell
+	LoggerShell *initr.LoggerShell
+	config      *zaal.Config
 }
 
 func (app *App) GetName() string {
@@ -39,29 +38,6 @@ func Must(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func (app *App) InitGrpc(ctx context.Context, name string, opts *initropts.GrpcServerBuilder) error {
-	if opts == nil {
-		opts = initropts.GrpcServer()
-	}
-	server := app.config.GRPC.Servers[name]
-	if server.Features.Logging {
-		opts.SetLogging(app.Logger())
-	}
-	if server.Features.Reflection {
-		opts.WithReflection()
-	}
-	if server.Features.HealthCheck {
-		opts.WithHealthCheck()
-	}
-
-	shell, err := initr.GrpcServer(ctx, opts)
-	if err != nil {
-		return err
-	}
-	app.GrpcServerShell = shell
-	return nil
 }
 
 func (app *App) InitZap(ctx context.Context) error {
