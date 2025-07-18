@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
-func (r *Runner) AddGrpcServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) {
+func (r *Runner) AddGRPCServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) {
 	r.eg.Go(func() error {
 		port := serverConfig.Port
 		r.logger.Info("starting grpc server", "port", port)
