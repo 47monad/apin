@@ -15,14 +15,14 @@ import (
 func (r *Runner) AddGrpcServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) {
 	r.eg.Go(func() error {
 		port := serverConfig.Port
-		r.app.Logger().Info("starting grpc server", "port", port)
+		r.logger.Info("starting grpc server", "port", port)
 		return serveOnPort(srv, port)
 	})
 }
 
 func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, checker func(context.Context) bool) {
 	r.eg.Go(func() error {
-		runHealthChecker(r.app.GetName(), hc, interval, func(hc *health.Server, setServing func(bool)) {
+		runHealthChecker(r.name, hc, interval, func(hc *health.Server, setServing func(bool)) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 

@@ -11,7 +11,7 @@ func (r *Runner) AddHttp(server *zaal.HTTPServerConfig, attacher func(*http.Serv
 	port := server.Port
 	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(port)}
 	r.eg.Go(func() error {
-		r.app.Logger().Info("starting http server", "port", port)
+		r.logger.Info("starting http server", "port", port)
 		m := http.NewServeMux()
 		attacher(m)
 		httpSrv.Handler = m
