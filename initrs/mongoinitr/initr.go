@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/47monad/apin/initropts"
+	"github.com/47monad/apin"
 	"github.com/47monad/zaal"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -26,13 +26,13 @@ func MustNewFromConfig(ctx context.Context, config *zaal.MongodbConfig) *Shell {
 func NewFromConfig(ctx context.Context, config *zaal.MongodbConfig) (*Shell, error) {
 	b := Opts()
 	b.SetURI(config.URI)
-	if config.DbName != "" {
-		b.SetDBName(config.DbName)
+	if config.DBName != "" {
+		b.SetDBName(config.DBName)
 	}
 	return _init(ctx, b)
 }
 
-func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
+func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
 	shell, err := _init(ctx, b)
 	if err != nil {
 		panic(err)
@@ -40,11 +40,11 @@ func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
 	return shell
 }
 
-func New(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func New(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 	return _init(ctx, b)
 }
 
-func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 	store, err := b.Build()
 	if err != nil {
 		return nil, err

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/47monad/apin/initropts"
+	"github.com/47monad/apin"
 	"github.com/47monad/zaal"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -15,11 +15,11 @@ type Shell struct {
 	Client *clientv3.Client
 }
 
-func New(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func New(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 	return _init(ctx, b)
 }
 
-func MustNew(ctx context.Context, b initropts.Builder[*Store]) *Shell {
+func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
 	shell, err := New(ctx, b)
 	if err != nil {
 		panic(err)
@@ -50,7 +50,7 @@ func MustNewFromConfig(ctx context.Context, config *zaal.EtcdConfig) *Shell {
 	return shell
 }
 
-func _init(ctx context.Context, b initropts.Builder[*Store]) (*Shell, error) {
+func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 	store, err := b.Build()
 	if err != nil {
 		return nil, err

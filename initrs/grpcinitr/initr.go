@@ -3,7 +3,7 @@ package grpcinitr
 import (
 	"context"
 
-	"github.com/47monad/apin/initropts"
+	"github.com/47monad/apin"
 	"github.com/47monad/zaal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -44,7 +44,7 @@ func NewFromConfig(ctx context.Context, config *zaal.GRPCServerConfig) (*ServerS
 	return shell, nil
 }
 
-func MustNew(ctx context.Context, b initropts.Builder[*ServerStore]) *ServerShell {
+func MustNew(ctx context.Context, b apin.Builder[*ServerStore]) *ServerShell {
 	shell, err := New(ctx, b)
 	if err != nil {
 		panic(err)
@@ -52,11 +52,11 @@ func MustNew(ctx context.Context, b initropts.Builder[*ServerStore]) *ServerShel
 	return shell
 }
 
-func New(ctx context.Context, b initropts.Builder[*ServerStore]) (*ServerShell, error) {
+func New(ctx context.Context, b apin.Builder[*ServerStore]) (*ServerShell, error) {
 	return _init(ctx, b)
 }
 
-func _init(ctx context.Context, b initropts.Builder[*ServerStore]) (*ServerShell, error) {
+func _init(ctx context.Context, b apin.Builder[*ServerStore]) (*ServerShell, error) {
 	store, err := b.Build()
 	if err != nil {
 		return nil, err

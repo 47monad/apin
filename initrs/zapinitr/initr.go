@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/apin/initropts"
 	"github.com/47monad/zaal"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
@@ -24,7 +23,7 @@ func NewFromConfig(ctx context.Context, config *zaal.LoggingConfig) (*apin.Logge
 	return _init(ctx, b)
 }
 
-func MustNew(ctx context.Context, b initropts.Builder[*Store]) *apin.LoggerShell {
+func MustNew(ctx context.Context, b apin.Builder[*Store]) *apin.LoggerShell {
 	shell, err := _init(ctx, b)
 	if err != nil {
 		panic(err)
@@ -32,11 +31,11 @@ func MustNew(ctx context.Context, b initropts.Builder[*Store]) *apin.LoggerShell
 	return shell
 }
 
-func New(ctx context.Context, b initropts.Builder[*Store]) (*apin.LoggerShell, error) {
+func New(ctx context.Context, b apin.Builder[*Store]) (*apin.LoggerShell, error) {
 	return _init(ctx, b)
 }
 
-func _init(ctx context.Context, b initropts.Builder[*Store]) (*apin.LoggerShell, error) {
+func _init(ctx context.Context, b apin.Builder[*Store]) (*apin.LoggerShell, error) {
 	_, err := b.Build()
 	if err != nil {
 		return nil, err
