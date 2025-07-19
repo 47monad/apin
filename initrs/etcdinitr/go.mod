@@ -5,7 +5,7 @@ go 1.24.0
 replace github.com/47monad/apin => ../..
 
 require (
-	github.com/47monad/apin v0.0.0-00010101000000-000000000000
+	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
 	github.com/47monad/zaal v0.1.3-0.20250718170128-2cf80571d125
 	go.etcd.io/etcd/client/v3 v3.6.0
 )
