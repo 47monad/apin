@@ -1,6 +1,10 @@
 package rmqinitr
 
-import "time"
+import (
+	"time"
+
+	"github.com/47monad/zaal"
+)
 
 type Store struct {
 	URI              string
@@ -26,6 +30,19 @@ func (b *Builder) Build() (*Store, error) {
 	}
 
 	return store, nil
+}
+
+func (b *Builder) WithConfig(config *zaal.RabbitMQConfig) *Builder {
+	b.SetURI(config.URI)
+	if config.MinRetryInterval == 0 {
+		config.MinRetryInterval = 1
+	}
+	if config.MaxRetryInterval == 0 {
+		config.MaxRetryInterval = 30
+	}
+	b.SetMinRetryInterval(time.Duration(config.MinRetryInterval) * time.Second)
+	b.SetMaxRetryInterval(time.Duration(config.MaxRetryInterval) * time.Second)
+	return b
 }
 
 func (b *Builder) SetURI(uri string) *Builder {

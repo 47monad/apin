@@ -1,8 +1,10 @@
 package etcdinitr
 
 import (
+	"strings"
 	"time"
 
+	"github.com/47monad/zaal"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -12,6 +14,20 @@ type Store struct {
 
 type Builder struct {
 	Opts []func(*Store) error
+}
+
+func (b *Builder) WithConfig(config *zaal.EtcdConfig) *Builder {
+	b.SetEndpoints(strings.Split(config.Endpoints, ","))
+	if config.Username != "" {
+		b.SetUsername(config.Username)
+	}
+	if config.Password != "" {
+		b.SetPassword(config.Password)
+	}
+	if config.Timeout > 0 {
+		b.SetTimeout(time.Duration(config.Timeout) * time.Second)
+	}
+	return b
 }
 
 func (b *Builder) Build() (*Store, error) {

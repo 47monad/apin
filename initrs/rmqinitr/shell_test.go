@@ -59,7 +59,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestNewFromConfig_ValidConnection(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{URI: rabbitmqURI})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{URI: rabbitmqURI}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -74,9 +75,10 @@ func TestNewFromConfig_ValidConnection(t *testing.T) {
 }
 
 func TestNewRabbitManager_InvalidConnection(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: "amqp://invalid:invalid@localhost:9999/",
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: "amqp://invalid:invalid@localhost:9999/",
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -86,9 +88,10 @@ func TestNewRabbitManager_InvalidConnection(t *testing.T) {
 }
 
 func TestGetChannel_WhenHealthy(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: rabbitmqURI,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: rabbitmqURI,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -106,11 +109,12 @@ func TestGetChannel_WhenHealthy(t *testing.T) {
 }
 
 func TestGetChannel_WhenUnhealthy(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI:              "amqp://invalid:invalid@localhost:9999/",
-		MinRetryInterval: 1,
-		MaxRetryInterval: 2,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI:              "amqp://invalid:invalid@localhost:9999/",
+			MinRetryInterval: 1,
+			MaxRetryInterval: 2,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -122,9 +126,10 @@ func TestGetChannel_WhenUnhealthy(t *testing.T) {
 }
 
 func TestGetChannel_AfterClose(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: rabbitmqURI,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: rabbitmqURI,
+		}))
 	require.NoError(t, err)
 
 	// Wait for connection
@@ -146,11 +151,12 @@ func TestGetChannel_AfterClose(t *testing.T) {
 }
 
 func TestReconnection_AfterConnectionLoss(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI:              rabbitmqURI,
-		MaxRetryInterval: 4,
-		MinRetryInterval: 1,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI:              rabbitmqURI,
+			MaxRetryInterval: 4,
+			MinRetryInterval: 1,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -184,9 +190,10 @@ func TestReconnection_AfterConnectionLoss(t *testing.T) {
 }
 
 func TestConcurrentAccess(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: rabbitmqURI,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: rabbitmqURI,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -246,11 +253,12 @@ func TestConcurrentAccess(t *testing.T) {
 }
 
 func TestWaitForHealth_Timeout(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI:              "amqp://invalid:invalid@localhost:9999/",
-		MaxRetryInterval: 5,
-		MinRetryInterval: 1,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI:              "amqp://invalid:invalid@localhost:9999/",
+			MaxRetryInterval: 5,
+			MinRetryInterval: 1,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -263,9 +271,10 @@ func TestWaitForHealth_Timeout(t *testing.T) {
 }
 
 func TestWaitForHealth_Success(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: rabbitmqURI,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: rabbitmqURI,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -277,9 +286,10 @@ func TestWaitForHealth_Success(t *testing.T) {
 }
 
 func TestClose_MultipleCallsSafe(t *testing.T) {
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI: rabbitmqURI,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI: rabbitmqURI,
+		}))
 	require.NoError(t, err)
 
 	// Multiple close calls should be safe
@@ -296,11 +306,12 @@ func TestExponentialBackoff(t *testing.T) {
 	// This test verifies that retry intervals increase (indirectly)
 	start := time.Now()
 
-	shell, err := rmqinitr.NewFromConfig(context.Background(), &zaal.RabbitMQConfig{
-		URI:              "amqp://invalid:invalid@localhost:9999/",
-		MaxRetryInterval: 4,
-		MinRetryInterval: 1,
-	})
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.Opts().WithConfig(&zaal.RabbitMQConfig{
+			URI:              "amqp://invalid:invalid@localhost:9999/",
+			MaxRetryInterval: 4,
+			MinRetryInterval: 1,
+		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 

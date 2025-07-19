@@ -1,5 +1,7 @@
 package zapinitr
 
+import "github.com/47monad/zaal"
+
 type Store struct{}
 
 type Builder struct {
@@ -8,6 +10,10 @@ type Builder struct {
 
 func (b *Builder) Build() (*Store, error) {
 	return &Store{}, nil
+}
+
+func (b *Builder) WithConfig(config *zaal.LoggingConfig) *Builder {
+	return b
 }
 
 func Opts() *Builder {

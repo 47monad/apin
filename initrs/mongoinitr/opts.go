@@ -3,6 +3,7 @@ package mongoinitr
 import (
 	"time"
 
+	"github.com/47monad/zaal"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
@@ -31,6 +32,14 @@ func (b *Builder) Build() (*Store, error) {
 	}
 
 	return store, nil
+}
+
+func (b *Builder) WithConfig(config *zaal.MongodbConfig) *Builder {
+	b.SetURI(config.URI)
+	if config.DBName != "" {
+		b.SetDBName(config.DBName)
+	}
+	return b
 }
 
 func (b *Builder) SetURI(uri string) *Builder {

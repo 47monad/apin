@@ -4,26 +4,11 @@ import (
 	"context"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/zaal"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Shell struct {
 	Registry *prometheus.Registry
-}
-
-func MustNewFromConfig(ctx context.Context, config *zaal.PrometheusConfig) *Shell {
-	shell, err := NewFromConfig(ctx, config)
-	if err != nil {
-		panic(err)
-	}
-	return shell
-}
-
-func NewFromConfig(ctx context.Context, config *zaal.PrometheusConfig) (*Shell, error) {
-	opts := Opts()
-	// TODO: enable grpc metrics here
-	return _init(ctx, opts)
 }
 
 func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {

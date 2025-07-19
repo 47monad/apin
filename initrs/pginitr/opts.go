@@ -1,5 +1,7 @@
 package pginitr
 
+import "github.com/47monad/zaal"
+
 type Store struct {
 	URI string
 }
@@ -10,6 +12,11 @@ type Builder struct {
 
 func (b *Builder) Build() (*Store, error) {
 	return &Store{}, nil
+}
+
+func (b *Builder) WithConfig(config *zaal.PostgresConfig) *Builder {
+	b.SetURI(config.URI)
+	return b
 }
 
 func (b *Builder) SetURI(uri string) *Builder {

@@ -3,11 +3,8 @@ package etcdinitr
 import (
 	"context"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/zaal"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -21,29 +18,6 @@ func New(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 
 func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
 	shell, err := New(ctx, b)
-	if err != nil {
-		panic(err)
-	}
-	return shell
-}
-
-func NewFromConfig(ctx context.Context, config *zaal.EtcdConfig) (*Shell, error) {
-	o := Opts()
-	o.SetEndpoints(strings.Split(config.Endpoints, ","))
-	if config.Username != "" {
-		o.SetUsername(config.Username)
-	}
-	if config.Password != "" {
-		o.SetPassword(config.Password)
-	}
-	if config.Timeout > 0 {
-		o.SetTimeout(time.Duration(config.Timeout) * time.Second)
-	}
-	return _init(ctx, o)
-}
-
-func MustNewFromConfig(ctx context.Context, config *zaal.EtcdConfig) *Shell {
-	shell, err := NewFromConfig(ctx, config)
 	if err != nil {
 		panic(err)
 	}

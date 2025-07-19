@@ -6,30 +6,12 @@ import (
 	"time"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/zaal"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type Shell struct {
 	Client *mongo.Client
-	Db     *mongo.Database
-}
-
-func MustNewFromConfig(ctx context.Context, config *zaal.MongodbConfig) *Shell {
-	shell, err := NewFromConfig(ctx, config)
-	if err != nil {
-		panic(err)
-	}
-	return shell
-}
-
-func NewFromConfig(ctx context.Context, config *zaal.MongodbConfig) (*Shell, error) {
-	b := Opts()
-	b.SetURI(config.URI)
-	if config.DBName != "" {
-		b.SetDBName(config.DBName)
-	}
-	return _init(ctx, b)
+	DB     *mongo.Database
 }
 
 func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
@@ -64,7 +46,7 @@ func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 
 	shell := &Shell{Client: client}
 	if store.DBName != "" {
-		shell.Db = client.Database(store.DBName)
+		shell.DB = client.Database(store.DBName)
 	}
 
 	return shell, nil

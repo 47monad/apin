@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/zaal"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -22,21 +21,6 @@ func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
 }
 
 func New(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
-	return _init(ctx, b)
-}
-
-func MustNewFromConfig(ctx context.Context, config *zaal.PostgresConfig) *Shell {
-	shell, err := NewFromConfig(ctx, config)
-	if err != nil {
-		panic(err)
-	}
-	return shell
-}
-
-func NewFromConfig(ctx context.Context, config *zaal.PostgresConfig) (*Shell, error) {
-	b := Opts()
-	b.SetURI(config.URI)
-
 	return _init(ctx, b)
 }
 
