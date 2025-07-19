@@ -1,6 +1,7 @@
 package grpcinitr
 
 import (
+	"github.com/47monad/zaal"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 )
@@ -38,6 +39,19 @@ func (b *ServerBuilder) WithRunnable(runnable func(store *grpc.Server)) *ServerB
 		s.Runnable = runnable
 		return nil
 	})
+	return b
+}
+
+func (b *ServerBuilder) WithConfig(config *zaal.GRPCServerConfig) *ServerBuilder {
+	if config == nil {
+		return b
+	}
+	if config.Features.Reflection {
+		b.WithReflection()
+	}
+	if config.Features.HealthCheck {
+		b.WithHealthCheck()
+	}
 	return b
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/47monad/apin"
-	"github.com/47monad/zaal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -14,34 +13,6 @@ import (
 type ServerShell struct {
 	Server       *grpc.Server
 	HealthServer *health.Server
-}
-
-func MustNewFromConfig(ctx context.Context, config *zaal.GRPCServerConfig) *ServerShell {
-	shell, err := NewFromConfig(ctx, config)
-	if err != nil {
-		panic(err)
-	}
-	return shell
-}
-
-func NewFromConfig(ctx context.Context, config *zaal.GRPCServerConfig) (*ServerShell, error) {
-	opts := Opts()
-	// if config.Features.Logging {
-	// 	opts.SetLogging(app.Logger())
-	// }
-	if config.Features.Reflection {
-		opts.WithReflection()
-	}
-	if config.Features.HealthCheck {
-		opts.WithHealthCheck()
-	}
-
-	shell, err := _init(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return shell, nil
 }
 
 func MustNew(ctx context.Context, b apin.Builder[*ServerStore]) *ServerShell {

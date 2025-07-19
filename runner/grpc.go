@@ -12,15 +12,16 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
-func (r *Runner) AddGRPCServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) {
+func (r *Runner) AddGRPCServer(serverConfig *zaal.GRPCServerConfig, srv *grpc.Server) *Runner {
 	r.eg.Go(func() error {
 		port := serverConfig.Port
 		r.logger.Info("starting grpc server", "port", port)
 		return serveOnPort(srv, port)
 	})
+	return r
 }
 
-func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, checker func(context.Context) bool) {
+func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, checker func(context.Context) bool) *Runner {
 	r.eg.Go(func() error {
 		runHealthChecker(r.name, hc, interval, func(hc *health.Server, setServing func(bool)) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -35,6 +36,7 @@ func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, check
 		})
 		return nil
 	})
+	return r
 }
 
 func serveOnPort(srv *grpc.Server, port int) error {

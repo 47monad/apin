@@ -7,7 +7,7 @@ import (
 	"github.com/47monad/zaal"
 )
 
-func (r *Runner) AddHTTPServer(server *zaal.HTTPServerConfig, attacher func(*http.ServeMux)) {
+func (r *Runner) AddHTTPServer(server *zaal.HTTPServerConfig, attacher func(*http.ServeMux)) *Runner {
 	port := server.Port
 	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(port)}
 	r.eg.Go(func() error {
@@ -17,4 +17,5 @@ func (r *Runner) AddHTTPServer(server *zaal.HTTPServerConfig, attacher func(*htt
 		httpSrv.Handler = m
 		return httpSrv.ListenAndServe()
 	})
+	return r
 }
