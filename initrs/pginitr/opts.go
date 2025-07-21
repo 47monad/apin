@@ -11,7 +11,19 @@ type Builder struct {
 }
 
 func (b *Builder) Build() (*Store, error) {
-	return &Store{}, nil
+	store := &Store{}
+
+	for _, opt := range b.Opts {
+		if opt == nil {
+			continue
+		}
+
+		if err := opt(store); err != nil {
+			return nil, err
+		}
+	}
+
+	return store, nil
 }
 
 func (b *Builder) WithConfig(config *zaal.PostgresConfig) *Builder {
