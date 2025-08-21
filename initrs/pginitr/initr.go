@@ -30,7 +30,7 @@ func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 		return nil, err
 	}
 
-	conn, err := pgx.Connect(ctx, store.URI)
+	conn, err := pgx.Connect(ctx, store.URI.String())
 	if err != nil {
 		panic(err)
 	}

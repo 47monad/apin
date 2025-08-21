@@ -11,7 +11,9 @@ import (
 
 func TestInit(t *testing.T) {
 	config := &zaal.PostgresConfig{
-		URI: "postgres://postgres:123456789@localhost:5432",
+		URI:      "postgres://localhost:5432/settings",
+		Username: "postgres",
+		Password: "123456789",
 	}
 
 	shell, err := pginitr.New(context.Background(), pginitr.Opts().WithConfig(config))
