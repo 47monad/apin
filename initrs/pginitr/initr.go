@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/47monad/apin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Shell struct {
-	Conn *pgx.Conn
+	Pool *pgxpool.Pool
 }
 
 func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
@@ -30,24 +30,26 @@ func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 		return nil, err
 	}
 
-	conn, err := pgx.Connect(ctx, store.URI.String())
+	cfg, err := pgxpool.ParseConfig(store.URI.String())
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to parse postgres config: %w", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create postgres connection pool: %w", err)
 	}
 
 	return &Shell{
-		Conn: conn,
+		Pool: pool,
 	}, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {
-	if shell.Conn == nil {
+	if shell.Pool == nil {
 		return nil
 	}
 
-	err := shell.Conn.Close(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to close postgres connection: %v", err)
-	}
+	shell.Pool.Close()
 	return nil
 }

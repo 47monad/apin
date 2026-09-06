@@ -44,6 +44,9 @@ func (b *Builder) WithConfig(config *zaal.PostgresConfig) *Builder {
 	if config.Host != "" {
 		b.SetHost(config.Host)
 	}
+	if config.Port != "" {
+		b.SetPort(config.Port)
+	}
 	if config.DBName != "" {
 		b.SetDBName(config.DBName)
 	}
@@ -76,6 +79,18 @@ func (b *Builder) SetUser(user *url.Userinfo) *Builder {
 func (b *Builder) SetHost(host string) *Builder {
 	b.Opts = append(b.Opts, func(s *Store) error {
 		s.URI.Host = host
+		return nil
+	})
+	return b
+}
+
+func (b *Builder) SetPort(port string) *Builder {
+	b.Opts = append(b.Opts, func(s *Store) error {
+		host := s.URI.Hostname()
+		if host == "" {
+			return nil
+		}
+		s.URI.Host = host + ":" + port
 		return nil
 	})
 	return b

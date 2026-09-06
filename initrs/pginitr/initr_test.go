@@ -20,7 +20,7 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println("connection done")
-		shell.Conn.Close(context.Background())
+		fmt.Println("connection pool created")
+		shell.Pool.Close()
 	}
 }
