@@ -45,7 +45,7 @@ func (shell *Shell) Close(ctx context.Context) error {
 
 	err := shell.Client.Close()
 	if err != nil {
-		return fmt.Errorf("failed to disconnect from etcd: %v", err)
+		return fmt.Errorf("failed to disconnect from etcd: %w", err)
 	}
 	return nil
 }
