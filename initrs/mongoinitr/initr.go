@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/47monad/apin"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Shell struct {
@@ -14,21 +14,20 @@ type Shell struct {
 	DB     *mongo.Database
 }
 
-func MustNew(ctx context.Context, b apin.Builder[*Store]) *Shell {
-	shell, err := _init(ctx, b)
+func MustNew(ctx context.Context, opts ...Option) *Shell {
+	shell, err := New(ctx, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return shell
 }
 
-func New(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
-	return _init(ctx, b)
-}
-
-func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
-	store, err := b.Build()
-	if err != nil {
+func New(ctx context.Context, opts ...Option) (*Shell, error) {
+	store := &Store{
+		Opts:        options.Client(),
+		PingTimeout: 10 * time.Second,
+	}
+	if err := apply(store, opts); err != nil {
 		return nil, err
 	}
 
@@ -37,10 +36,10 @@ func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, store.PingTimeout)
 	defer cancel()
 
-	if err = client.Ping(ctx, nil); err != nil {
+	if err = client.Ping(pingCtx, nil); err != nil {
 		return nil, fmt.Errorf("problem pinging database: %w", err)
 	}
 

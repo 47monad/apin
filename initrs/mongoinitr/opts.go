@@ -7,65 +7,71 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+// Store is the resolved configuration of a shell.
 type Store struct {
-	Opts   *options.ClientOptions
-	DBName string
+	Opts        *options.ClientOptions
+	DBName      string
+	PingTimeout time.Duration
 }
 
-type Builder struct {
-	Opts []func(*Store) error
-}
+// Option mutates the store. Options are applied in the order they are passed
+// to New, so later options win.
+type Option func(*Store) error
 
-func (b *Builder) Build() (*Store, error) {
-	store := &Store{
-		Opts: options.Client(),
+// WithConfig applies a zaal config section. It is the entry point for
+// config-file driven setups.
+func WithConfig(config *zaal.MongodbConfig) Option {
+	return func(s *Store) error {
+		if config == nil {
+			return nil
+		}
+		return apply(s, []Option{
+			WithURI(config.URI),
+			WithDBName(config.DBName),
+		})
 	}
+}
 
-	for _, opt := range b.Opts {
+// WithURI applies a mongodb connection URI.
+func WithURI(uri string) Option {
+	return func(s *Store) error {
+		s.Opts.ApplyURI(uri)
+		return nil
+	}
+}
+
+// WithTimeout sets the driver connect timeout.
+func WithTimeout(d time.Duration) Option {
+	return func(s *Store) error {
+		s.Opts.SetConnectTimeout(d)
+		return nil
+	}
+}
+
+// WithDBName sets the default database of the returned shell.
+func WithDBName(name string) Option {
+	return func(s *Store) error {
+		s.DBName = name
+		return nil
+	}
+}
+
+// WithPingTimeout sets the readiness ping timeout. Defaults to 10s.
+func WithPingTimeout(d time.Duration) Option {
+	return func(s *Store) error {
+		s.PingTimeout = d
+		return nil
+	}
+}
+
+func apply(s *Store, opts []Option) error {
+	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-
-		if err := opt(store); err != nil {
-			return nil, err
+		if err := opt(s); err != nil {
+			return err
 		}
 	}
-
-	return store, nil
-}
-
-func (b *Builder) WithConfig(config *zaal.MongodbConfig) *Builder {
-	b.SetURI(config.URI)
-	if config.DBName != "" {
-		b.SetDBName(config.DBName)
-	}
-	return b
-}
-
-func (b *Builder) SetURI(uri string) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.ApplyURI(uri)
-		return nil
-	})
-	return b
-}
-
-func (b *Builder) SetTimeout(d time.Duration) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.SetConnectTimeout(d)
-		return nil
-	})
-	return b
-}
-
-func (b *Builder) SetDBName(name string) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.DBName = name
-		return nil
-	})
-	return b
-}
-
-func Opts() *Builder {
-	return &Builder{}
+	return nil
 }
