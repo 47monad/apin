@@ -109,3 +109,10 @@ func TestApplyURIInvalid(t *testing.T) {
 		t.Fatal("New() error = nil, want invalid scheme error")
 	}
 }
+
+func TestShellDBNotInitialized(t *testing.T) {
+	shell := &pginitr.Shell{}
+	if _, err := shell.DB(); err == nil {
+		t.Fatal("DB() error = nil on uninitialized shell, want error")
+	}
+}

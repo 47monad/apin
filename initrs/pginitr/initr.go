@@ -8,7 +8,23 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Querier is the common query surface of *pgx.Conn and *pgxpool.Pool. It lets
+// callers run queries without branching on the shell mode.
+type Querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Begin(ctx context.Context) (pgx.Tx, error)
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
+var (
+	_ Querier = (*pgx.Conn)(nil)
+	_ Querier = (*pgxpool.Pool)(nil)
 )
 
 // Shell holds the postgres connection. Exactly one of Pool or Conn is
@@ -106,6 +122,19 @@ func applyPoolConfig(cfg *pgxpool.Config, pool PoolConfig) {
 	if pool.HealthCheckInterval > 0 {
 		cfg.HealthCheckPeriod = time.Duration(pool.HealthCheckInterval) * time.Second
 	}
+}
+
+// DB returns the query surface of the shell, regardless of mode. Mode-specific
+// capabilities (e.g. Listen on Conn, Acquire/Stat on Pool) are available
+// through the exported fields.
+func (shell *Shell) DB() (Querier, error) {
+	if shell.Conn != nil {
+		return shell.Conn, nil
+	}
+	if shell.Pool != nil {
+		return shell.Pool, nil
+	}
+	return nil, fmt.Errorf("pginitr: shell is not initialized")
 }
 
 // Close releases the underlying connection or pool.
