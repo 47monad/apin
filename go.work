@@ -1,0 +1,13 @@
+go 1.27.0
+
+use (
+	.
+	./canary
+	./initrs/etcdinitr
+	./initrs/grpcinitr
+	./initrs/mongoinitr
+	./initrs/pginitr
+	./initrs/prominitr
+	./initrs/rmqinitr
+	./initrs/zapinitr
+)
