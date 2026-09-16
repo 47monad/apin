@@ -6,7 +6,7 @@ replace github.com/47monad/apin => ../..
 
 require (
 	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
-	github.com/47monad/zaal v0.1.3-0.20250820123129-03fad6e4d119
+	github.com/47monad/zaal v0.1.3-0.20260916141141-b819246ff6dd
 	github.com/jackc/pgx/v5 v5.7.5
 )
 
