@@ -5,10 +5,10 @@ go 1.24.0
 replace github.com/47monad/apin => ../..
 
 require (
-	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
 	github.com/47monad/zaal v0.1.3-0.20250718170128-2cf80571d125
 	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-connections v0.5.0
+	github.com/go-logr/logr v1.4.2
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
@@ -32,7 +32,6 @@ require (
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/emicklei/proto v1.13.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

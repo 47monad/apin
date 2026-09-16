@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -24,12 +24,25 @@ type Shell struct {
 	closed   bool
 	stopChan chan struct{}
 	wg       sync.WaitGroup
+	logger   logr.Logger
 
 	store *Store
 }
 
 func (r *Shell) reconnectLoop() {
 	defer r.wg.Done()
+
+	// A synchronous initial connection may already be established; monitor it
+	// until it drops, then fall through to the reconnect loop.
+	r.lock.RLock()
+	initialConn, initialChan := r.conn, r.channel
+	r.lock.RUnlock()
+	if initialConn != nil {
+		r.waitForClose(initialConn, initialChan)
+		r.cleanupResources()
+		r.setHealth(false)
+		r.logger.Info("connection lost, attempting to reconnect...")
+	}
 
 	retryInterval := r.store.MinRetryInterval
 
@@ -40,7 +53,7 @@ func (r *Shell) reconnectLoop() {
 		default:
 			conn, ch, err := r.tryConnect()
 			if err != nil {
-				log.Printf("RabbitMQ reconnect failed: %v", err)
+				r.logger.Error(err, "rabbitmq reconnect failed")
 				r.setHealth(false)
 
 				// Exponential backoff
@@ -62,7 +75,7 @@ func (r *Shell) reconnectLoop() {
 			r.lock.Unlock()
 
 			r.setHealth(true)
-			log.Println("RabbitMQ connected successfully")
+			r.logger.Info("rabbitmq connected successfully")
 
 			// Wait for connection or channel to close
 			r.waitForClose(conn, ch)
@@ -70,7 +83,7 @@ func (r *Shell) reconnectLoop() {
 			// Clean up resources safely
 			r.cleanupResources()
 			r.setHealth(false)
-			log.Println("Connection lost, attempting to reconnect...")
+			r.logger.Info("connection lost, attempting to reconnect...")
 		}
 	}
 }
@@ -108,11 +121,11 @@ func (r *Shell) waitForClose(conn *amqp.Connection, ch *amqp.Channel) {
 	select {
 	case err := <-connClosed:
 		if err != nil {
-			log.Printf("RabbitMQ connection closed: %v", err)
+			r.logger.Error(fmt.Errorf("%v", err), "rabbitmq connection closed")
 		}
 	case err := <-chClosed:
 		if err != nil {
-			log.Printf("RabbitMQ channel closed: %v", err)
+			r.logger.Error(fmt.Errorf("%v", err), "rabbitmq channel closed")
 		}
 	case <-r.stopChan:
 		return
@@ -125,14 +138,14 @@ func (r *Shell) cleanupResources() {
 
 	if r.channel != nil {
 		if err := r.channel.Close(); err != nil {
-			log.Printf("Error closing channel: %v", err)
+			r.logger.Error(err, "error closing channel")
 		}
 		r.channel = nil
 	}
 
 	if r.conn != nil {
 		if err := r.conn.Close(); err != nil {
-			log.Printf("Error closing connection: %v", err)
+			r.logger.Error(err, "error closing connection")
 		}
 		r.conn = nil
 	}
