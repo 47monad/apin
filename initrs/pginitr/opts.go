@@ -28,99 +28,58 @@ type PoolConfig struct {
 	HealthCheckInterval int
 }
 
+// Store is the resolved configuration of a shell. Options are applied to it
+// in the order they are passed to New, so later options win.
 type Store struct {
 	URI  *url.URL
+	Port string // composed onto the URI host after all options are applied
 	Mode Mode
 	Pool PoolConfig
 }
 
-type Builder struct {
-	Opts []func(*Store) error
-}
+// Option mutates the store. Options returning an error fail New immediately.
+type Option func(*Store) error
 
-func (b *Builder) Build() (*Store, error) {
-	store := &Store{
-		URI: &url.URL{Scheme: "postgres"},
-	}
-
-	for _, opt := range b.Opts {
-		if opt == nil {
-			continue
-		}
-
-		if err := opt(store); err != nil {
-			return nil, err
-		}
-	}
-
-	if store.Mode == "" {
-		store.Mode = ModePool
-	}
-
-	return store, nil
-}
-
-func (b *Builder) WithConfig(config *zaal.PostgresConfig) *Builder {
-	if config.URI != "" {
-		b.ApplyURI(config.URI)
-	}
-	if config.Username != "" {
-		b.SetUser(url.UserPassword(config.Username, config.Password))
-	}
-	if config.Host != "" {
-		b.SetHost(config.Host)
-	}
-	if config.Port != 0 {
-		b.SetPort(strconv.Itoa(config.Port))
-	}
-	if config.DBName != "" {
-		b.SetDBName(config.DBName)
-	}
-	if config.SSLMode != "" {
-		b.SetSSLMode(config.SSLMode)
-	}
-	if config.AppName != "" {
-		b.SetParam("application_name", config.AppName)
-	}
-	if config.ConnTimeout > 0 {
-		b.SetParam("connect_timeout", strconv.Itoa(config.ConnTimeout))
-	}
-	if config.Mode != "" {
-		b.WithMode(Mode(config.Mode))
-	}
-	b.SetPoolConfig(PoolConfig{
-		MaxConns:            config.Pool.MaxConns,
-		MinConns:            config.Pool.MinConns,
-		MaxConnLifetime:     config.Pool.MaxConnLifetime,
-		MaxConnIdleTime:     config.Pool.MaxConnIdleTime,
-		HealthCheckInterval: config.Pool.HealthCheckInterval,
-	})
-	return b
-}
-
-func (b *Builder) WithMode(mode Mode) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
-		switch mode {
-		case ModePool, ModeConn:
-			s.Mode = mode
+// WithConfig applies a zaal config section. It is the entry point for
+// config-file driven setups; later options override individual fields.
+func WithConfig(config *zaal.PostgresConfig) Option {
+	return func(s *Store) error {
+		if config == nil {
 			return nil
-		default:
-			return fmt.Errorf("invalid pginitr mode: %q", mode)
 		}
-	})
-	return b
+		opts := []Option{
+			WithURI(config.URI),
+			WithUser(url.UserPassword(config.Username, config.Password)),
+			WithHost(config.Host),
+			WithPort(config.Port),
+			WithDBName(config.DBName),
+			WithSSLMode(config.SSLMode),
+			WithParam("application_name", config.AppName),
+		}
+		if config.ConnTimeout > 0 {
+			opts = append(opts, WithParam("connect_timeout", strconv.Itoa(config.ConnTimeout)))
+		}
+		if config.Mode != "" {
+			opts = append(opts, WithMode(Mode(config.Mode)))
+		}
+		opts = append(opts, WithPoolConfig(PoolConfig{
+			MaxConns:            config.Pool.MaxConns,
+			MinConns:            config.Pool.MinConns,
+			MaxConnLifetime:     config.Pool.MaxConnLifetime,
+			MaxConnIdleTime:     config.Pool.MaxConnIdleTime,
+			HealthCheckInterval: config.Pool.HealthCheckInterval,
+		}))
+		return apply(s, opts)
+	}
 }
 
-func (b *Builder) WithPool() *Builder {
-	return b.WithMode(ModePool)
-}
-
-func (b *Builder) WithSingleConn() *Builder {
-	return b.WithMode(ModeConn)
-}
-
-func (b *Builder) ApplyURI(uri string) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
+// WithURI merges connection details from a postgres URI. Query params on the
+// URI are preserved unless overridden by later options.
+func WithURI(uri string) Option {
+	return func(s *Store) error {
+		if uri == "" {
+			return nil
+		}
 		parsed, err := ParseURI(uri)
 		if err != nil {
 			return fmt.Errorf("failed to apply postgres URI: %w", err)
@@ -151,54 +110,57 @@ func (b *Builder) ApplyURI(uri string) *Builder {
 			s.URI.RawQuery = existing.Encode()
 		}
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetUser(user *url.Userinfo) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
+// WithUser sets explicit URL user info, taking precedence over URI-derived
+// credentials.
+func WithUser(user *url.Userinfo) Option {
+	return func(s *Store) error {
 		s.URI.User = user
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetHost(host string) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
+// WithHost sets the database host.
+func WithHost(host string) Option {
+	return func(s *Store) error {
 		s.URI.Host = host
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetPort(port string) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
-		host := s.URI.Hostname()
-		if host == "" {
-			return nil
+// WithPort sets the database port. It composes with WithHost and URIs
+// regardless of option order.
+func WithPort(port int) Option {
+	return func(s *Store) error {
+		if port != 0 {
+			s.Port = strconv.Itoa(port)
 		}
-		s.URI.Host = host + ":" + port
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetDBName(dbname string) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
-		s.URI.Path = dbname
+// WithDBName sets the database name.
+func WithDBName(dbname string) Option {
+	return func(s *Store) error {
+		if dbname != "" {
+			s.URI.Path = dbname
+		}
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetSSLMode(sslmode string) *Builder {
-	return b.SetParam("sslmode", sslmode)
+// WithSSLMode sets the sslmode URI parameter.
+func WithSSLMode(sslmode string) Option {
+	return WithParam("sslmode", sslmode)
 }
 
-func (b *Builder) SetParam(key, value string) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
-		if s.URI.RawQuery == "" {
-			s.URI.RawQuery = url.Values{key: []string{value}}.Encode()
+// WithParam sets a single URI parameter, overriding same-named parameters
+// from earlier options.
+func WithParam(key, value string) Option {
+	return func(s *Store) error {
+		if value == "" {
 			return nil
 		}
 		query, err := url.ParseQuery(s.URI.RawQuery)
@@ -208,18 +170,48 @@ func (b *Builder) SetParam(key, value string) *Builder {
 		query.Set(key, value)
 		s.URI.RawQuery = query.Encode()
 		return nil
-	})
-	return b
+	}
 }
 
-func (b *Builder) SetPoolConfig(pool PoolConfig) *Builder {
-	b.Opts = append(b.Opts, func(s *Store) error {
+// WithMode sets the connection strategy explicitly.
+func WithMode(mode Mode) Option {
+	return func(s *Store) error {
+		switch mode {
+		case ModePool, ModeConn:
+			s.Mode = mode
+			return nil
+		default:
+			return fmt.Errorf("invalid pginitr mode: %q", mode)
+		}
+	}
+}
+
+// WithPool selects pool mode. Pool mode is the default.
+func WithPool() Option {
+	return WithMode(ModePool)
+}
+
+// WithSingleConn selects single-connection mode.
+func WithSingleConn() Option {
+	return WithMode(ModeConn)
+}
+
+// WithPoolConfig sets pool tuning. Only applied in pool mode.
+func WithPoolConfig(pool PoolConfig) Option {
+	return func(s *Store) error {
 		s.Pool = pool
 		return nil
-	})
-	return b
+	}
 }
 
-func Opts() *Builder {
-	return &Builder{}
+func apply(s *Store, opts []Option) error {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
