@@ -34,14 +34,14 @@ func _init(ctx context.Context, b apin.Builder[*Store]) (*Shell, error) {
 
 	client, err := mongo.Connect(store.Opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MongoDB: %v", err)
+		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	if err = client.Ping(ctx, nil); err != nil {
-		return nil, fmt.Errorf("problem pinging database: %v", err)
+		return nil, fmt.Errorf("problem pinging database: %w", err)
 	}
 
 	shell := &Shell{Client: client}
@@ -59,7 +59,7 @@ func (shell *Shell) Close(ctx context.Context) error {
 
 	err := shell.Client.Disconnect(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to disconnect from mongodb: %v", err)
+		return fmt.Errorf("failed to disconnect from mongodb: %w", err)
 	}
 	return nil
 }
