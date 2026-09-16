@@ -1,21 +1,46 @@
 package zapinitr
 
-import "github.com/47monad/zaal"
+import (
+	"github.com/47monad/zaal"
+)
 
-type Store struct{}
-
-type Builder struct {
-	Opts []func(*Store) error
+// Store is the resolved configuration of a logger shell.
+type Store struct {
+	Level string
 }
 
-func (b *Builder) Build() (*Store, error) {
-	return &Store{}, nil
+// Option mutates the store. Options are applied in the order they are passed
+// to New, so later options win.
+type Option func(*Store) error
+
+// WithConfig applies a zaal config section. It is the entry point for
+// config-file driven setups.
+func WithConfig(config *zaal.LoggingConfig) Option {
+	return func(s *Store) error {
+		if config == nil {
+			return nil
+		}
+		return apply(s, []Option{WithLevel(config.Level)})
+	}
 }
 
-func (b *Builder) WithConfig(config *zaal.LoggingConfig) *Builder {
-	return b
+// WithLevel sets the log level (e.g. "debug", "info", "error"). Defaults to
+// zap's production default.
+func WithLevel(level string) Option {
+	return func(s *Store) error {
+		s.Level = level
+		return nil
+	}
 }
 
-func Opts() *Builder {
-	return &Builder{}
+func apply(s *Store, opts []Option) error {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
