@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// ServerStore is the resolved configuration of a server shell.
 type ServerStore struct {
 	Interceptors []grpc.UnaryServerInterceptor
 	HealthCheck  bool
@@ -14,89 +15,65 @@ type ServerStore struct {
 	Runnable     func(*grpc.Server)
 }
 
-type ServerBuilder struct {
-	Opts []func(*ServerStore) error
+// Option mutates the store. Options are applied in the order they are passed
+// to New, so later options win.
+type Option func(*ServerStore) error
+
+// WithConfig applies a zaal config section. It is the entry point for
+// config-file driven setups.
+func WithConfig(config *zaal.GRPCServerConfig) Option {
+	return func(s *ServerStore) error {
+		if config == nil {
+			return nil
+		}
+		return apply(s, []Option{
+			WithReflection(config.Features.Reflection),
+			WithHealthCheck(config.Features.HealthCheck),
+		})
+	}
 }
 
-func (b *ServerBuilder) Build() (*ServerStore, error) {
-	store := &ServerStore{}
+// WithRunnable registers bootstrap logic to run against the created server,
+// such as registering service implementations.
+func WithRunnable(runnable func(server *grpc.Server)) Option {
+	return func(s *ServerStore) error {
+		s.Runnable = runnable
+		return nil
+	}
+}
 
-	for _, opt := range b.Opts {
+// WithReflection enables the gRPC reflection service.
+func WithReflection(enabled bool) Option {
+	return func(s *ServerStore) error {
+		s.Reflection = enabled
+		return nil
+	}
+}
+
+// WithHealthCheck registers the standard gRPC health checking service.
+func WithHealthCheck(enabled bool) Option {
+	return func(s *ServerStore) error {
+		s.HealthCheck = enabled
+		return nil
+	}
+}
+
+// AddInterceptor appends a unary interceptor.
+func AddInterceptor(i grpc.UnaryServerInterceptor) Option {
+	return func(s *ServerStore) error {
+		s.Interceptors = append(s.Interceptors, i)
+		return nil
+	}
+}
+
+func apply(s *ServerStore, opts []Option) error {
+	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-
-		if err := opt(store); err != nil {
-			return nil, err
+		if err := opt(s); err != nil {
+			return err
 		}
 	}
-
-	return store, nil
-}
-
-func (b *ServerBuilder) WithRunnable(runnable func(store *grpc.Server)) *ServerBuilder {
-	b.Opts = append(b.Opts, func(s *ServerStore) error {
-		s.Runnable = runnable
-		return nil
-	})
-	return b
-}
-
-func (b *ServerBuilder) WithConfig(config *zaal.GRPCServerConfig) *ServerBuilder {
-	if config == nil {
-		return b
-	}
-	if config.Features.Reflection {
-		b.WithReflection()
-	}
-	if config.Features.HealthCheck {
-		b.WithHealthCheck()
-	}
-	return b
-}
-
-func (b *ServerBuilder) WithHealthCheck() *ServerBuilder {
-	b.Opts = append(b.Opts, func(s *ServerStore) error {
-		s.HealthCheck = true
-		return nil
-	})
-	return b
-}
-
-// func (b *ServerBuilder) SetPrometheus(reg *prometheus.Registry) *ServerBuilder {
-// 	b.Opts = append(b.Opts, func(s *ServerStore) error {
-// 		promInterceptor, metrics := grpcutil.WithPromMonitoring(reg)
-// 		s.PromMetrics = metrics
-// 		s.Interceptors = append(s.Interceptors, promInterceptor)
-// 		return nil
-// 	})
-// 	return b
-// }
-
-// func (b *ServerBuilder) SetLogging(l logr.Logger) *ServerBuilder {
-// 	b.Opts = append(b.Opts, func(b *ServerStore) error {
-// 		b.Interceptors = append(b.Interceptors, grpcutil.NewLoggingInterceptor(l))
-// 		return nil
-// 	})
-// 	return b
-// }
-
-func (b *ServerBuilder) WithReflection() *ServerBuilder {
-	b.Opts = append(b.Opts, func(s *ServerStore) error {
-		s.Reflection = true
-		return nil
-	})
-	return b
-}
-
-func (b *ServerBuilder) AddInterceptor(i grpc.UnaryServerInterceptor) *ServerBuilder {
-	b.Opts = append(b.Opts, func(s *ServerStore) error {
-		s.Interceptors = append(s.Interceptors, i)
-		return nil
-	})
-	return b
-}
-
-func Opts() *ServerBuilder {
-	return &ServerBuilder{}
+	return nil
 }

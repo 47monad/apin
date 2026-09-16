@@ -5,7 +5,6 @@ go 1.24.0
 replace github.com/47monad/apin => ../..
 
 require (
-	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
 	github.com/47monad/zaal v0.1.3-0.20250718170128-2cf80571d125
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	google.golang.org/grpc v1.72.0
@@ -18,7 +17,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/emicklei/proto v1.13.4 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
