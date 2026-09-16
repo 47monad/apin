@@ -8,78 +8,76 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+// Store is the resolved configuration of a shell.
 type Store struct {
 	Opts *clientv3.Config
 }
 
-type Builder struct {
-	Opts []func(*Store) error
+// Option mutates the store. Options are applied in the order they are passed
+// to New, so later options win.
+type Option func(*Store) error
+
+// WithConfig applies a zaal config section. It is the entry point for
+// config-file driven setups.
+func WithConfig(config *zaal.EtcdConfig) Option {
+	return func(s *Store) error {
+		if config == nil {
+			return nil
+		}
+		opts := []Option{WithEndpoints(strings.Split(config.Endpoints, ","))}
+		if config.Username != "" {
+			opts = append(opts, WithUsername(config.Username))
+		}
+		if config.Password != "" {
+			opts = append(opts, WithPassword(config.Password))
+		}
+		if config.Timeout > 0 {
+			opts = append(opts, WithTimeout(time.Duration(config.Timeout)*time.Second))
+		}
+		return apply(s, opts)
+	}
 }
 
-func (b *Builder) WithConfig(config *zaal.EtcdConfig) *Builder {
-	b.SetEndpoints(strings.Split(config.Endpoints, ","))
-	if config.Username != "" {
-		b.SetUsername(config.Username)
+// WithEndpoints sets the etcd endpoints.
+func WithEndpoints(endpoints []string) Option {
+	return func(s *Store) error {
+		s.Opts.Endpoints = endpoints
+		return nil
 	}
-	if config.Password != "" {
-		b.SetPassword(config.Password)
-	}
-	if config.Timeout > 0 {
-		b.SetTimeout(time.Duration(config.Timeout) * time.Second)
-	}
-	return b
 }
 
-func (b *Builder) Build() (*Store, error) {
-	store := &Store{
-		Opts: &clientv3.Config{},
+// WithUsername sets the auth username.
+func WithUsername(username string) Option {
+	return func(s *Store) error {
+		s.Opts.Username = username
+		return nil
 	}
+}
 
-	for _, opt := range b.Opts {
+// WithPassword sets the auth password.
+func WithPassword(password string) Option {
+	return func(s *Store) error {
+		s.Opts.Password = password
+		return nil
+	}
+}
+
+// WithTimeout sets the dial timeout.
+func WithTimeout(d time.Duration) Option {
+	return func(s *Store) error {
+		s.Opts.DialTimeout = d
+		return nil
+	}
+}
+
+func apply(s *Store, opts []Option) error {
+	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-
-		if err := opt(store); err != nil {
-			return nil, err
+		if err := opt(s); err != nil {
+			return err
 		}
 	}
-
-	return store, nil
-}
-
-func (b *Builder) SetEndpoints(endpoints []string) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.Endpoints = endpoints
-		return nil
-	})
-	return b
-}
-
-func (b *Builder) SetUsername(username string) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.Username = username
-		return nil
-	})
-	return b
-}
-
-func (b *Builder) SetPassword(password string) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.Password = password
-		return nil
-	})
-	return b
-}
-
-func (b *Builder) SetTimeout(d time.Duration) *Builder {
-	b.Opts = append(b.Opts, func(o *Store) error {
-		o.Opts.DialTimeout = d
-		return nil
-	})
-	return b
-}
-
-func Opts() *Builder {
-	return &Builder{}
+	return nil
 }
