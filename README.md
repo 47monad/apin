@@ -95,6 +95,9 @@ A returned shell is ready to use (connections are verified at `New`), and
 SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
 order.
 
+A complete runnable version of this lives in
+[`examples/grpcsvc`](examples/grpcsvc) — including a `config.json` for zaal.
+
 ## The Shell Law
 
 Every initr follows the same contract, so any service reads the same way:
@@ -182,6 +185,7 @@ Initrs can also be configured without any config file, using options only.
 - `closr/` — the `Closer` alias, kept for compatibility
 - `runner/` — errgroup-based concurrent runner
 - `initrs/` — one module per service initr
+- `examples/` — runnable example services (see `examples/grpcsvc`)
 
 ## Contributing
 

@@ -32,3 +32,10 @@ jobs:
             (cd "$d" && go build ./... && go vet ./... && go test ./...)
             echo "::endgroup::"
           done
+
+      - name: Build examples
+        run: |
+          set -e
+          for d in examples/*/; do
+            (cd "$d" && go build ./... && go vet ./...)
+          done
