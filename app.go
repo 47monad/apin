@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/47monad/apin/manifest"
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,6 +22,12 @@ const defaultShutdownTimeout = 30 * time.Second
 type App struct {
 	logger          logr.Logger
 	shutdownTimeout time.Duration
+	config          *manifest.Config
+
+	// configPath and envPath are recorded by the WithConfig/WithEnv options
+	// and consumed once after all options are applied.
+	configPath string
+	envPath    string
 
 	mu      sync.Mutex
 	closers []Closer
