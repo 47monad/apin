@@ -5,7 +5,6 @@ go 1.24.0
 replace github.com/47monad/apin => ../..
 
 require (
-	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
 	github.com/47monad/zaal v0.1.3-0.20250718170128-2cf80571d125
 	go.etcd.io/etcd/client/v3 v3.6.0
 )
@@ -17,7 +16,6 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/emicklei/proto v1.13.4 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect

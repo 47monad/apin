@@ -24,27 +24,38 @@ func config() *zaal.PostgresConfig {
 func TestInitModes(t *testing.T) {
 	tests := []struct {
 		name    string
-		opts    func() *pginitr.Builder
+		opts    []pginitr.Option
 		wantMod pginitr.Mode
 	}{
-		{name: "default", opts: func() *pginitr.Builder { return pginitr.Opts() }, wantMod: pginitr.ModePool},
-		{name: "pool", opts: func() *pginitr.Builder { return pginitr.Opts().WithPool() }, wantMod: pginitr.ModePool},
-		{name: "singleConn", opts: func() *pginitr.Builder { return pginitr.Opts().WithSingleConn() }, wantMod: pginitr.ModeConn},
+		{
+			name:    "default",
+			opts:    []pginitr.Option{pginitr.WithConfig(config())},
+			wantMod: pginitr.ModePool,
+		},
+		{
+			name:    "pool",
+			opts:    []pginitr.Option{pginitr.WithConfig(config()), pginitr.WithPool()},
+			wantMod: pginitr.ModePool,
+		},
+		{
+			name:    "singleConn",
+			opts:    []pginitr.Option{pginitr.WithConfig(config()), pginitr.WithSingleConn()},
+			wantMod: pginitr.ModeConn,
+		},
+		{
+			name: "optionsOnly",
+			opts: []pginitr.Option{
+				pginitr.WithHost("localhost"),
+				pginitr.WithPort(5432),
+				pginitr.WithDBName("settings"),
+			},
+			wantMod: pginitr.ModePool,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := tt.opts().WithConfig(config())
-
-			store, err := b.Build()
-			if err != nil {
-				t.Fatalf("Build() error = %v", err)
-			}
-			if store.Mode != tt.wantMod {
-				t.Errorf("Store.Mode = %q, want %q", store.Mode, tt.wantMod)
-			}
-
-			shell, err := pginitr.New(context.Background(), tt.opts().WithConfig(config()))
+			shell, err := pginitr.New(context.Background(), tt.opts...)
 			if err != nil {
 				t.Logf("skipping connection checks (no live postgres): %v", err)
 				return
@@ -79,58 +90,29 @@ func TestInitModes(t *testing.T) {
 }
 
 func TestWithInvalidMode(t *testing.T) {
-	b := pginitr.Opts().WithMode("invalid")
+	_, err := pginitr.New(context.Background(), pginitr.WithConfig(config()), pginitr.WithMode("invalid"))
+	if err == nil {
+		t.Fatal("New() error = nil, want invalid mode error")
+	}
+}
 
-	if _, err := b.Build(); err == nil {
-		t.Fatal("Build() error = nil, want invalid mode error")
+func TestWithoutConfiguration(t *testing.T) {
+	_, err := pginitr.New(context.Background())
+	if err == nil {
+		t.Fatal("New() error = nil, want missing configuration error")
 	}
 }
 
 func TestApplyURIInvalid(t *testing.T) {
-	b := pginitr.Opts().ApplyURI("http://localhost:5432/settings")
-
-	if _, err := b.Build(); err == nil {
-		t.Fatal("Build() error = nil, want invalid scheme error")
+	_, err := pginitr.New(context.Background(), pginitr.WithURI("http://localhost:5432/settings"))
+	if err == nil {
+		t.Fatal("New() error = nil, want invalid scheme error")
 	}
 }
 
-func TestWithConfigMapping(t *testing.T) {
-	store, err := pginitr.Opts().WithConfig(&zaal.PostgresConfig{
-		Host:        "localhost",
-		Port:        5432,
-		Username:    "postgres",
-		Password:    "secret",
-		DBName:      "settings",
-		SSLMode:     "disable",
-		AppName:     "apin",
-		ConnTimeout: 5,
-		Mode:        "conn",
-		Pool: zaal.PostgresPoolConfig{
-			MaxConns:        10,
-			MinConns:        2,
-			MaxConnLifetime: 3600,
-			MaxConnIdleTime: 300,
-		},
-	}).Build()
-	if err != nil {
-		t.Fatalf("Build() error = %v", err)
-	}
-
-	if got, want := store.URI.String(), "postgres://postgres:secret@localhost:5432/settings?application_name=apin&connect_timeout=5&sslmode=disable"; got != want {
-		t.Errorf("Store.URI = %q, want %q", got, want)
-	}
-	if store.Mode != pginitr.ModeConn {
-		t.Errorf("Store.Mode = %q, want %q", store.Mode, pginitr.ModeConn)
-	}
-	if store.Pool.MaxConns != 10 || store.Pool.MinConns != 2 || store.Pool.MaxConnLifetime != 3600 || store.Pool.MaxConnIdleTime != 300 {
-		t.Errorf("Store.Pool = %+v, want mapped pool config", store.Pool)
-	}
-}
-
-func TestWithConfigModeInvalid(t *testing.T) {
-	b := pginitr.Opts().WithConfig(&zaal.PostgresConfig{Mode: "wat"})
-
-	if _, err := b.Build(); err == nil {
-		t.Fatal("Build() error = nil, want invalid mode error")
+func TestShellDBNotInitialized(t *testing.T) {
+	shell := &pginitr.Shell{}
+	if _, err := shell.DB(); err == nil {
+		t.Fatal("DB() error = nil on uninitialized shell, want error")
 	}
 }

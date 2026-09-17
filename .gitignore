@@ -14,9 +14,7 @@
 # Dependency directories
 vendor/
 
-# Go workspace file
-go.work
-
 builds/
 
 .idea/
+/examples/grpcsvc/grpcsvc

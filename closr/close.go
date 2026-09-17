@@ -1,10 +1,14 @@
 package closr
 
-import "context"
+import (
+	"context"
 
-type Closer interface {
-	Close(ctx context.Context) error
-}
+	"github.com/47monad/apin"
+)
+
+// Closer is the lifecycle contract for shells. Aliased from the apin core so
+// existing references keep working; prefer apin.Closer in new code.
+type Closer = apin.Closer
 
 type Options struct {
 	ctx context.Context

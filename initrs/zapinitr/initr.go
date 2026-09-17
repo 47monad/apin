@@ -2,6 +2,7 @@ package zapinitr
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/47monad/apin"
 	"github.com/go-logr/zapr"
@@ -9,32 +10,37 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func MustNew(ctx context.Context, b apin.Builder[*Store]) *apin.LoggerShell {
-	shell, err := _init(ctx, b)
+func MustNew(ctx context.Context, opts ...Option) *apin.LoggerShell {
+	shell, err := New(ctx, opts...)
 	if err != nil {
 		panic(err)
 	}
 	return shell
 }
 
-func New(ctx context.Context, b apin.Builder[*Store]) (*apin.LoggerShell, error) {
-	return _init(ctx, b)
-}
-
-func _init(ctx context.Context, b apin.Builder[*Store]) (*apin.LoggerShell, error) {
-	_, err := b.Build()
-	if err != nil {
+func New(ctx context.Context, opts ...Option) (*apin.LoggerShell, error) {
+	store := &Store{}
+	if err := apply(store, opts); err != nil {
 		return nil, err
 	}
+
 	config := zap.NewProductionConfig()
+	if store.Level != "" {
+		level, err := zapcore.ParseLevel(store.Level)
+		if err != nil {
+			return nil, fmt.Errorf("invalid zapinitr log level %q: %w", store.Level, err)
+		}
+		config.Level = zap.NewAtomicLevelAt(level)
+	}
+
 	encoderConfig := zap.NewProductionEncoderConfig()
-	zapcore.TimeEncoderOfLayout("Jan _2 15:04:05.000000000")
+	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("Jan _2 15:04:05.000000000")
 	encoderConfig.StacktraceKey = "" // to hide stacktrace info
 	config.EncoderConfig = encoderConfig
 
 	zapLog, err := config.Build(zap.AddCallerSkip(1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to build zap logger: %w", err)
 	}
 
 	return &apin.LoggerShell{
