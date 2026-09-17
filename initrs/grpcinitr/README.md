@@ -20,7 +20,7 @@ srvShell, err := grpcinitr.New(ctx,
 	grpcinitr.WithRunnable(func(s *grpc.Server) {
 		pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 	}),
-	grpcinitr.AddInterceptor(authInterceptor),
+	grpcinitr.WithInterceptor(authInterceptor),
 )
 ```
 
@@ -54,7 +54,7 @@ type ServerShell struct {
 | `WithReflection(enabled bool)` | register the gRPC reflection service |
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
-| `AddInterceptor(i grpc.UnaryServerInterceptor)` | append a unary interceptor (repeatable) |
+| `WithInterceptor(i grpc.UnaryServerInterceptor)` | append a unary interceptor (repeatable) |
 
 ## Config mapping
 

@@ -127,7 +127,7 @@ Every initr follows the same contract, so any service reads the same way:
 |---|---|
 | `WithConfig(cfg)` | apply a manifest config section |
 | `With*` | set a scalar / toggle / composite |
-| `Add*` | append to a list (e.g. `AddInterceptor`) |
+| `Add*` | append to a list |
 
 ## Initrs
 
