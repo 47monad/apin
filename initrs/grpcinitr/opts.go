@@ -58,8 +58,9 @@ func WithHealthCheck(enabled bool) Option {
 	}
 }
 
-// AddInterceptor appends a unary interceptor.
-func AddInterceptor(i grpc.UnaryServerInterceptor) Option {
+// WithInterceptor appends a unary interceptor. It is repeatable; each call
+// adds another interceptor, applied in the order they are registered.
+func WithInterceptor(i grpc.UnaryServerInterceptor) Option {
 	return func(s *ServerStore) error {
 		s.Interceptors = append(s.Interceptors, i)
 		return nil
