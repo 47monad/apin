@@ -15,11 +15,11 @@ import (
 // Querier is the common query surface of *pgx.Conn and *pgxpool.Pool. It lets
 // callers run queries without branching on the shell mode.
 type Querier interface {
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Begin(ctx context.Context) (pgx.Tx, error)
-	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+	Exec(context.Context, string, ...interface{}) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...interface{}) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...interface{}) pgx.Row
+	Begin(context.Context) (pgx.Tx, error)
+	SendBatch(context.Context, *pgx.Batch) pgx.BatchResults
 }
 
 var (
