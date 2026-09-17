@@ -1,29 +1,24 @@
 # apin
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/47monad/apin)](https://goreportcard.com/report/github.com/47monad/apin)
 [![Go Reference](https://pkg.go.dev/badge/github.com/47monad/apin.svg)](https://pkg.go.dev/github.com/47monad/apin)
 
-> **apin** (/æpin/) - short for "**ap**p **in**itializer" - A toolkit for bootstrapping Go applications with elegance and simplicity.
+> **apin** (/æpin/) - short for "**ap**p **in**itializer" - Uniform starting points for Go microservices.
 
 ## Overview
 
-Apin is a lightweight, modular framework designed to streamline the initialization and bootstrapping process of Go applications. It provides a structured approach to setting up application components, managing dependencies, and handling service lifecycles.
+Apin provides a uniform way to bootstrap the infrastructure services a
+microservice needs. Each service (`pginitr`, `mongoinitr`, `rmqinitr`, ...)
+is a separate Go module that turns a [zaal](https://github.com/47monad/zaal)
+config section into a ready-to-use **Shell** — with functional options for
+programmatic overrides.
 
-## Features
-
-- **Modular Architecture**: Define your application as a collection of independent modules
-- **Dependency Management**: Declare and inject dependencies between application components
-- **Lifecycle Control**: Graceful startup and shutdown of services
-- **Configuration Integration**: Seamless handling of configuration from different sources
-- **Context Propagation**: Proper context handling throughout your application
-- **Middleware Support**: Easily add cross-cutting concerns to your application
-- **Testing Friendly**: Simple approach to mocking and testing components
-
-## Installation
+You install only the initrs your service actually needs:
 
 ```bash
 go get github.com/47monad/apin
+go get github.com/47monad/apin/initrs/pginitr
 ```
 
 ## Quick Start
@@ -32,175 +27,171 @@ go get github.com/47monad/apin
 package main
 
 import (
- "context"
- "log"
- "time"
+	"context"
+	"fmt"
+	"log"
+	"net"
 
- "github.com/47monad/apin"
+	"google.golang.org/grpc"
+
+	"github.com/47monad/apin"
+	"github.com/47monad/apin/initrs/grpcinitr"
+	"github.com/47monad/apin/initrs/pginitr"
+	"github.com/47monad/apin/initrs/zapinitr"
+	"github.com/47monad/zaal"
 )
 
 func main() {
- // Create a new app initializer
- app := apin.New()
+	ctx := context.Background()
 
- // Register modules
- app.Register(
-  // Configuration module
-  NewConfigModule(),
-  // Database module
-  NewDatabaseModule(),
-  // Service module
-  NewServiceModule(),
- )
+	cfg, err := zaal.New("config.json", ".env") // zaal parses the config file
+	if err != nil {
+		log.Fatal(err)
+	}
 
- // Run the application with a timeout context
- ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
- defer cancel()
+	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
+	if err != nil {
+		log.Fatal(err)
+	}
 
- if err := app.Run(ctx); err != nil {
-  log.Fatalf("application failed: %v", err)
- }
-}
+	app := apin.NewApp(apin.WithLogger(loggerShell.Logger))
 
-// Example module implementation
-type ConfigModule struct {
- // Module fields
-}
+	dbShell, err := pginitr.New(ctx,
+		pginitr.WithConfig(cfg.Postgres), // config file values...
+		pginitr.WithSSLMode("require"),   // ...overridden field by field
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.Track(dbShell)
 
-func NewConfigModule() *ConfigModule {
- return &ConfigModule{}
-}
+	grpcCfg := cfg.GRPC.Servers["api"]
+	srvShell, err := grpcinitr.New(ctx,
+		grpcinitr.WithConfig(&grpcCfg),
+		grpcinitr.WithRunnable(func(s *grpc.Server) {
+			pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
+		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.Track(srvShell)
 
-func (m *ConfigModule) Init(ctx context.Context) error {
- // Initialize configuration
- return nil
-}
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-func (m *ConfigModule) Name() string {
- return "config"
-}
-```
-
-## Core Concepts
-
-### Modules
-
-Modules are the building blocks of your application. Each module represents a discrete piece of functionality:
-
-```go
-// Module is the interface that all application modules must implement
-type Module interface {
- // Init initializes the module
- Init(ctx context.Context) error
- 
- // Name returns the module name
- Name() string
+	if err := app.Run(ctx, func(ctx context.Context) error {
+		return srvShell.Serve(ctx, lis) // serves until app shutdown
+	}); err != nil {
+		loggerShell.Logger.Error(err, "application failed")
+	}
 }
 ```
 
-### Application Lifecycle
+A returned shell is ready to use (connections are verified at `New`), and
+`app.Run` blocks until a runnable fails, the context is cancelled, or
+SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
+order.
 
-Apin manages your application's lifecycle through these phases:
+## The Shell Law
 
-1. **Registration**: Register all modules
-2. **Initialization**: Modules are initialized in dependency order
-3. **Running**: The application runs until interrupted or context cancelled
-4. **Shutdown**: Modules are shut down in reverse order
+Every initr follows the same contract, so any service reads the same way:
 
-### Dependency Management
+1. **Shells.** Each initr returns a `Shell` — the ready-to-use handle for its
+   service (e.g. `pginitr.Shell`, `rmqinitr.Shell`). Cross-cutting shells
+   (logging) return `apin.LoggerShell`, so consumers are logger-agnostic.
+2. **Construction.** `New(ctx, opts ...Option)` and `MustNew(ctx, opts...)`.
+   `New` connects eagerly and fails fast on missing configuration or dial
+   errors.
+3. **Options.** Functional options (`Option func(*Store) error`) are applied
+   in order; later options win.
+4. **Config entry point.** `WithConfig(*zaal.XConfig)` is the config-file
+   path. Individual `With*` options override single fields on top of it:
+   ```go
+   pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres), pginitr.WithPort(6543))
+   ```
+5. **Cleanup.** Every `Shell` implements `apin.Closer` (`Close(ctx) error`).
+6. **Library discipline.** Defaults are applied inside the initr (never by
+   mutating the caller's config), panics only ever come from `MustNew`, and
+   initrs never write to stderr — pass a logger with `WithLogger`.
 
-Define dependencies between modules to control initialization order:
+### Naming conventions
+
+| Form | Meaning |
+|---|---|
+| `WithConfig(cfg)` | apply a zaal config section |
+| `With*` | set a scalar / toggle / composite |
+| `Add*` | append to a list (e.g. `AddInterceptor`) |
+
+## Initrs
+
+| Module | Shell | Notes |
+|---|---|---|
+| `initrs/pginitr` | `Shell{Mode, Pool, Conn}` | pool (default) or single connection; `DB()` gives a mode-independent query surface |
+| `initrs/mongoinitr` | `Shell{Client, DB}` | ping-checked connection |
+| `initrs/etcdinitr` | `Shell{Client}` | |
+| `initrs/rmqinitr` | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
+| `initrs/grpcinitr` | `ServerShell{Server, HealthServer}` | health check + reflection toggles |
+| `initrs/prominitr` | `Shell{Registry}` | |
+| `initrs/zapinitr` | `apin.LoggerShell` | any logger initr returns the same shell |
+
+## Graceful Shutdown
+
+`apin.App` owns the shutdown:
 
 ```go
-// DatabaseModule depends on ConfigModule
-type DatabaseModule struct {
- Config *ConfigModule
-}
-
-func NewDatabaseModule() *DatabaseModule {
- return &DatabaseModule{}
-}
-
-func (m *DatabaseModule) Init(ctx context.Context) error {
- // Use m.Config which was injected automatically
- return nil
-}
-
-func (m *DatabaseModule) Name() string {
- return "database"
-}
-
-func (m *DatabaseModule) Requires() []string {
- return []string{"config"}
-}
+app := apin.NewApp(apin.WithLogger(loggerShell.Logger))
+defer app.Close(context.Background()) // manual lifecycle control
 ```
 
-## Advanced Usage
+- `app.Track(shell...)` — record shells for cleanup (call it right after each `New`)
+- `app.Run(ctx, runnables...)` — start serving; on SIGINT/SIGTERM or context
+  cancellation, runnables are cancelled and shells closed in reverse order,
+  bounded by a shutdown timeout (default 30s)
+- A second signal forces an immediate exit
 
-### Graceful Shutdown
+`app.Close(ctx)` alone closes tracked shells in reverse order — useful for
+tests or custom lifecycles.
 
-Implement the `Shutdown` interface to manage resource cleanup:
+The `runner` package still works on its own for concurrent multi-server
+setups (`runner.AddGRPCServer`, `AddHTTPServer`, `AddHealthCheck`) — pass
+`runner.Run` as the App's runnable (wrap it in a `func(ctx)` that ignores the
+context), or use `ServerShell.Serve` for the single-server case shown above.
 
-```go
-type ServerModule struct {
- server *http.Server
-}
+## Configuration
 
-func (m *ServerModule) Init(ctx context.Context) error {
- // Initialize HTTP server
- return nil
-}
-
-func (m *ServerModule) Shutdown(ctx context.Context) error {
- // Gracefully shutdown HTTP server
- return m.server.Shutdown(ctx)
-}
-```
-
-### Configuration Integration
-
-Integrate with your configuration management solution:
+Configs are plain structs from [zaal](https://github.com/47monad/zaal), so
+`WithConfig` is explicit at every call site — you always know where a value
+came from. Programmatic `With*` options compose with it, field by field:
 
 ```go
-app := apin.New(
- apin.WithConfig(&myConfig),
+pginitr.New(ctx,
+	pginitr.WithConfig(cfg.Postgres), // from the config file
+	pginitr.WithMode(pginitr.ModeConn), // override: single connection
+	pginitr.WithDBName("settings"),
 )
 ```
 
-## Example Applications
+Initrs can also be configured without any config file, using options only.
 
-See the [examples](https://github.com/47monad/apin/tree/main/examples) directory for complete working applications using apin:
+## Repository Layout
 
-- Basic HTTP API server
-- gRPC service
-- Worker application
-- CLI tool
-
-## Philosophy
-
-Apin follows these guiding principles:
-
-1. **Simplicity over complexity**: Straightforward APIs with minimal overhead
-2. **Explicit over implicit**: Clear declaration of dependencies and initialization order
-3. **Composition over inheritance**: Build applications from composable modules
-4. **Standard library first**: Leverage the Go standard library when possible
-5. **Testing first**: Design for testability from the ground up
+- `common.go`, `app.go` — apin core (`LoggerShell`, `Closer`, `App`)
+- `closr/` — the `Closer` alias, kept for compatibility
+- `runner/` — errgroup-based concurrent runner
+- `initrs/` — one module per service initr
+- `canary/` — a compatibility fixture importing every initr against the
+  latest zaal, so config schema drift fails CI, not your services
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+When adding an initr, follow the [Shell Law](#the-shell-law): a `Shell` type,
+`New`/`MustNew` with variadic options, `WithConfig` mapping the zaal section,
+defaults and fail-fast validation inside `New`, and a `Close(ctx) error`.
+Add the module to `go.work` and the `canary` fixture.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with ❤️ by [47monad](https://github.com/47monad)
-
