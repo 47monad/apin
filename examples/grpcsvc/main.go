@@ -1,5 +1,5 @@
-// Package main is a minimal apin service: a zaal config file, three initrs
-// (logging, postgres, grpc), and an apin.App owning the lifecycle.
+// Package main is a minimal apin service: a service manifest config file,
+// three initrs (logging, postgres, grpc), and an apin.App owning the lifecycle.
 //
 // Run it with a local postgres matching config.json; SIGINT/SIGTERM shut
 // everything down in reverse initialization order.
@@ -15,14 +15,13 @@ import (
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
-	"github.com/47monad/zaal"
 )
 
 func main() {
 	ctx := context.Background()
 
 	// Parse the config file. The env file is optional.
-	cfg, err := zaal.New("config.json", ".env")
+	cfg, err := apin.LoadConfig("config.json", ".env")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 )
 
 // Mode selects the connection strategy of the shell.
@@ -40,9 +40,9 @@ type Store struct {
 // Option mutates the store. Options returning an error fail New immediately.
 type Option func(*Store) error
 
-// WithConfig applies a zaal config section. It is the entry point for
+// WithConfig applies a manifest config section. It is the entry point for
 // config-file driven setups; later options override individual fields.
-func WithConfig(config *zaal.PostgresConfig) Option {
+func WithConfig(config *manifest.PostgresConfig) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/47monad/apin/initrs/pginitr"
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 )
 
-func config() *zaal.PostgresConfig {
-	return &zaal.PostgresConfig{
+func config() *manifest.PostgresConfig {
+	return &manifest.PostgresConfig{
 		Host:     "localhost",
 		Port:     5432,
 		Username: "postgres",

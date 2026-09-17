@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 )
 
-func (r *Runner) AddHTTPServer(server *zaal.HTTPServerConfig, attacher func(*http.ServeMux)) *Runner {
+func (r *Runner) AddHTTPServer(server *manifest.HTTPServerConfig, attacher func(*http.ServeMux)) *Runner {
 	port := server.Port
 	httpSrv := &http.Server{Addr: ":" + strconv.Itoa(port)}
 	r.eg.Go(func() error {

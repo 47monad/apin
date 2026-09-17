@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -17,9 +17,9 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a zaal config section. It is the entry point for
+// WithConfig applies a manifest config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *zaal.EtcdConfig) Option {
+func WithConfig(config *manifest.EtcdConfig) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

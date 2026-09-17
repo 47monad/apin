@@ -40,12 +40,12 @@ adapt `zaplogr.Logger` themselves.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.LoggingConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.LoggingConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithLevel(level string)` | log level (`"debug"`, `"info"`, ...); invalid values fail `New`; defaults to zap's production default |
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.LoggingConfig.Level`. It can be overridden by a
+`WithConfig` maps `*manifest.LoggingConfig.Level`. It can be overridden by a
 later option.
 
 ## Production preset
