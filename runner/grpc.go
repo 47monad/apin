@@ -29,9 +29,9 @@ func (r *Runner) AddHealthCheck(hc *health.Server, interval time.Duration, check
 
 			isHealthy := checker(ctx)
 			if isHealthy {
-				setServing(false)
-			} else {
 				setServing(true)
+			} else {
+				setServing(false)
 			}
 		})
 		return nil
