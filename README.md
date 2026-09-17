@@ -132,13 +132,13 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Module | Shell | Notes |
 |---|---|---|
-| `initrs/pginitr` | `Shell{Mode, Pool, Conn}` | pool (default) or single connection; `DB()` gives a mode-independent query surface |
-| `initrs/mongoinitr` | `Shell{Client, DB}` | ping-checked connection |
-| `initrs/etcdinitr` | `Shell{Client}` | |
-| `initrs/rmqinitr` | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
-| `initrs/grpcinitr` | `ServerShell{Server, HealthServer}` | health check + reflection toggles |
-| `initrs/prominitr` | `Shell{Registry}` | |
-| `initrs/zapinitr` | `apin.LoggerShell` | any logger initr returns the same shell |
+| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | pool (default) or single connection; `DB()` gives a mode-independent query surface |
+| [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection |
+| [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | |
+| [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
+| [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health check + reflection toggles; ctx-aware `Serve` |
+| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry}` | |
+| [`initrs/zapinitr`](initrs/zapinitr) | `apin.LoggerShell` | any logger initr returns the same shell |
 
 ## Graceful Shutdown
 
