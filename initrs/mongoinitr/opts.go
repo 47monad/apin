@@ -3,7 +3,7 @@ package mongoinitr
 import (
 	"time"
 
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
@@ -18,9 +18,9 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a zaal config section. It is the entry point for
+// WithConfig applies a manifest config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *zaal.MongodbConfig) Option {
+func WithConfig(config *manifest.MongodbConfig) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

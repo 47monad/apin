@@ -36,7 +36,7 @@ handler (`promhttp.HandlerFor(shell.Registry, ...)`).
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.PrometheusConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.PrometheusConfig)` | apply a manifest config section (entry point for config-file setups) |
 
 `GRPCMetrics` from the config is read into the store; wiring it into
 `grpcinitr` is still pending (see the TODO in `opts.go`).

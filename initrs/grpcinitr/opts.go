@@ -1,7 +1,7 @@
 package grpcinitr
 
 import (
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 )
@@ -19,9 +19,9 @@ type ServerStore struct {
 // to New, so later options win.
 type Option func(*ServerStore) error
 
-// WithConfig applies a zaal config section. It is the entry point for
+// WithConfig applies a manifest config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *zaal.GRPCServerConfig) Option {
+func WithConfig(config *manifest.GRPCServerConfig) Option {
 	return func(s *ServerStore) error {
 		if config == nil {
 			return nil

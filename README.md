@@ -10,9 +10,9 @@
 
 Apin provides a uniform way to bootstrap the infrastructure services a
 microservice needs. Each service (`pginitr`, `mongoinitr`, `rmqinitr`, ...)
-is a separate Go module that turns a [zaal](https://github.com/47monad/zaal)
-config section into a ready-to-use **Shell** — with functional options for
-programmatic overrides.
+is a separate Go module that turns a config section from the
+[service manifest](#configuration) into a ready-to-use **Shell** — with
+functional options for programmatic overrides.
 
 You install only the initrs your service actually needs:
 
@@ -38,13 +38,12 @@ import (
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
-	"github.com/47monad/zaal"
 )
 
 func main() {
 	ctx := context.Background()
 
-	cfg, err := zaal.New("config.json", ".env") // zaal parses the config file
+	cfg, err := apin.LoadConfig("config.json", ".env") // apin parses the config file
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -96,7 +95,8 @@ SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
 order.
 
 A complete runnable version of this lives in
-[`examples/grpcsvc`](examples/grpcsvc) — including a `config.json` for zaal.
+[`examples/grpcsvc`](examples/grpcsvc) — including a `config.json` for
+`apin.LoadConfig`.
 
 ## The Shell Law
 
@@ -110,8 +110,9 @@ Every initr follows the same contract, so any service reads the same way:
    errors.
 3. **Options.** Functional options (`Option func(*Store) error`) are applied
    in order; later options win.
-4. **Config entry point.** `WithConfig(*zaal.XConfig)` is the config-file
-   path. Individual `With*` options override single fields on top of it:
+4. **Config entry point.** `WithConfig(*manifest.XConfig)` is the config-file
+   path (the section types come from `apin.LoadConfig`). Individual `With*`
+   options override single fields on top of it:
    ```go
    pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres), pginitr.WithPort(6543))
    ```
@@ -124,7 +125,7 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Form | Meaning |
 |---|---|
-| `WithConfig(cfg)` | apply a zaal config section |
+| `WithConfig(cfg)` | apply a manifest config section |
 | `With*` | set a scalar / toggle / composite |
 | `Add*` | append to a list (e.g. `AddInterceptor`) |
 
@@ -165,9 +166,10 @@ context), or use `ServerShell.Serve` for the single-server case shown above.
 
 ## Configuration
 
-Configs are plain structs from [zaal](https://github.com/47monad/zaal), so
-`WithConfig` is explicit at every call site — you always know where a value
-came from. Programmatic `With*` options compose with it, field by field:
+The service manifest is a CUE-validated, env-overridable config loaded with
+`apin.LoadConfig` — the returned struct's sections (postgres, grpc, http,
+...) feed straight into initr `WithConfig` calls. Programmatic `With*`
+options compose with it, field by field:
 
 ```go
 pginitr.New(ctx,
@@ -181,7 +183,10 @@ Initrs can also be configured without any config file, using options only.
 
 ## Repository Layout
 
-- `common.go`, `app.go` — apin core (`LoggerShell`, `Closer`, `App`)
+- `common.go`, `app.go`, `config.go` — apin core (`LoggerShell`, `Closer`,
+  `App`, config loading)
+- `manifest/` — the service manifest: CUE schema, section structs, env
+  overlay, and the `LoadConfig` machinery (inlined from the former zaal repo)
 - `closr/` — the `Closer` alias, kept for compatibility
 - `runner/` — errgroup-based concurrent runner
 - `initrs/` — one module per service initr
@@ -190,9 +195,9 @@ Initrs can also be configured without any config file, using options only.
 ## Contributing
 
 When adding an initr, follow the [Shell Law](#the-shell-law): a `Shell` type,
-`New`/`MustNew` with variadic options, `WithConfig` mapping the zaal section,
-defaults and fail-fast validation inside `New`, and a `Close(ctx) error`.
-Add the module to `go.work`.
+`New`/`MustNew` with variadic options, `WithConfig` mapping its manifest
+section, defaults and fail-fast validation inside `New`, and a
+`Close(ctx) error`. Add the module to `go.work`.
 
 ## License
 

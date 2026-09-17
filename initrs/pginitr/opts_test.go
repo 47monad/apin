@@ -3,12 +3,12 @@ package pginitr
 import (
 	"testing"
 
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 )
 
 func TestOptionPrecedenceAndComposition(t *testing.T) {
 	store, err := newStore([]Option{
-		WithConfig(&zaal.PostgresConfig{
+		WithConfig(&manifest.PostgresConfig{
 			URI:      "postgres://fileuser:filepass@filehost:5433/filedb?sslmode=require",
 			Username: "user",
 			Password: "pass",
@@ -54,7 +54,7 @@ func TestDefaults(t *testing.T) {
 }
 
 func TestFullConfigMapping(t *testing.T) {
-	store, err := newStore([]Option{WithConfig(&zaal.PostgresConfig{
+	store, err := newStore([]Option{WithConfig(&manifest.PostgresConfig{
 		Host:        "localhost",
 		Port:        5432,
 		Username:    "postgres",
@@ -64,7 +64,7 @@ func TestFullConfigMapping(t *testing.T) {
 		AppName:     "apin",
 		ConnTimeout: 5,
 		Mode:        "conn",
-		Pool: zaal.PostgresPoolConfig{
+		Pool: manifest.PostgresPoolConfig{
 			MaxConns:        10,
 			MinConns:        2,
 			MaxConnLifetime: 3600,

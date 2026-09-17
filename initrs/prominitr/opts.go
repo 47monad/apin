@@ -1,7 +1,7 @@
 package prominitr
 
 import (
-	"github.com/47monad/zaal"
+	"github.com/47monad/apin/manifest"
 )
 
 // Store is the resolved configuration of a shell.
@@ -13,9 +13,9 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a zaal config section. It is the entry point for
+// WithConfig applies a manifest config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *zaal.PrometheusConfig) Option {
+func WithConfig(config *manifest.PrometheusConfig) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

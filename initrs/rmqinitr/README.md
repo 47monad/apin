@@ -48,7 +48,7 @@ channel state.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.RabbitMQConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.RabbitMQConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithURI(uri string)` | amqp connection URI |
 | `WithMinRetryInterval(d time.Duration)` | initial reconnect backoff; defaults to `1s` |
 | `WithMaxRetryInterval(d time.Duration)` | backoff cap; defaults to `30s`; must not be lower than min |
@@ -57,7 +57,7 @@ channel state.
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.RabbitMQConfig`: `URI`, and `MinRetryInterval` /
+`WithConfig` maps `*manifest.RabbitMQConfig`: `URI`, and `MinRetryInterval` /
 `MaxRetryInterval` (seconds). It never mutates the config you pass in. Any
 value can be overridden by a later option.
 

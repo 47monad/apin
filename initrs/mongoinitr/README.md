@@ -43,7 +43,7 @@ type Shell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.MongodbConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.MongodbConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithURI(uri string)` | apply a mongodb connection URI (applies all URI options to the driver) |
 | `WithTimeout(d time.Duration)` | driver connect timeout |
 | `WithDBName(name string)` | default database of the returned shell |
@@ -51,7 +51,7 @@ type Shell struct {
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.MongodbConfig`: `URI` and `DBName`. Any of these can
+`WithConfig` maps `*manifest.MongodbConfig`: `URI` and `DBName`. Any of these can
 be overridden by a later option.
 
 ## Lifecycle

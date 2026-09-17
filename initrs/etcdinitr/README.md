@@ -42,7 +42,7 @@ type Shell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.EtcdConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.EtcdConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithEndpoints(endpoints []string)` | etcd endpoints |
 | `WithUsername(username string)` | auth username |
 | `WithPassword(password string)` | auth password |
@@ -50,7 +50,7 @@ type Shell struct {
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.EtcdConfig`: comma-separated `Endpoints`,
+`WithConfig` maps `*manifest.EtcdConfig`: comma-separated `Endpoints`,
 `Username`, `Password`, and `Timeout` (seconds). Any of these can be
 overridden by a later option.
 

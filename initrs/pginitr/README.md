@@ -59,7 +59,7 @@ automatic reconnection — the pool is the default for a reason.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.PostgresConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.PostgresConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithURI(uri string)` | merge connection details from a postgres URI; query params preserved unless overridden later |
 | `WithUser(*url.Userinfo)` | explicit credentials; takes precedence over URI-derived ones |
 | `WithHost(host string)` | database host |
@@ -86,7 +86,7 @@ type PoolConfig struct {
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.PostgresConfig` field by field: `URI`, `Host`,
+`WithConfig` maps `*manifest.PostgresConfig` field by field: `URI`, `Host`,
 `Port` (int), `Username`/`Password`, `DBName`, `SSLMode` → `sslmode`,
 `AppName` → `application_name`, `ConnTimeout` → `connect_timeout`, `Mode`
 (`"pool"`/`"conn"`), and the `Pool` block. Any of these can be overridden by

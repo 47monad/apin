@@ -50,7 +50,7 @@ type ServerShell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*zaal.GRPCServerConfig)` | apply a zaal config section (entry point for config-file setups) |
+| `WithConfig(*manifest.GRPCServerConfig)` | apply a manifest config section (entry point for config-file setups) |
 | `WithReflection(enabled bool)` | register the gRPC reflection service |
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
@@ -58,7 +58,7 @@ type ServerShell struct {
 
 ## Config mapping
 
-`WithConfig` maps `*zaal.GRPCServerConfig.Features`: `Reflection` and
+`WithConfig` maps `*manifest.GRPCServerConfig.Features`: `Reflection` and
 `HealthCheck`. (The `Port` is used where you decide to listen — see serving
 above — the initr itself does not bind.) Any value can be overridden by a
 later option.
