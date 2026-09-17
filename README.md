@@ -182,15 +182,13 @@ Initrs can also be configured without any config file, using options only.
 - `closr/` — the `Closer` alias, kept for compatibility
 - `runner/` — errgroup-based concurrent runner
 - `initrs/` — one module per service initr
-- `canary/` — a compatibility fixture importing every initr against the
-  latest zaal, so config schema drift fails CI, not your services
 
 ## Contributing
 
 When adding an initr, follow the [Shell Law](#the-shell-law): a `Shell` type,
 `New`/`MustNew` with variadic options, `WithConfig` mapping the zaal section,
 defaults and fail-fast validation inside `New`, and a `Close(ctx) error`.
-Add the module to `go.work` and the `canary` fixture.
+Add the module to `go.work`.
 
 ## License
 

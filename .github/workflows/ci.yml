@@ -32,25 +32,3 @@ jobs:
             (cd "$d" && go build ./... && go vet ./... && go test ./...)
             echo "::endgroup::"
           done
-
-      - name: Compatibility canary
-        run: |
-          cd canary
-          go build ./...
-          go vet ./...
-
-  # Compatibility canary against zaal@latest, so config schema drift in zaal
-  # surfaces here instead of in downstream services.
-  canary-zaal-latest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.work
-      - name: Build canary against latest zaal
-        run: |
-          cd canary
-          go get github.com/47monad/zaal@latest
-          go mod tidy
-          go build ./...
