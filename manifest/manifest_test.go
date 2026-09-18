@@ -94,3 +94,28 @@ func TestPostgresCUESchema(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestGRPCClientAddressDefault(t *testing.T) {
+	// Build loads env files into the process environment. Clear client
+	// address vars so the empty CUE default is what we observe.
+	for _, name := range []string{"UWCL_GRPC_CLIENT_ADDRESS", "GRPC_CLIENT_ADDRESS"} {
+		os.Unsetenv(name)
+	}
+
+	t.Run("empty_client_uses_default_address/ok", func(t *testing.T) {
+		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg.GRPC)
+		client, ok := cfg.GRPC.Clients["uwcl"]
+		require.True(t, ok)
+		assert.Equal(t, "", client.Address)
+	})
+
+	t.Run("env_overrides_default_address/ok", func(t *testing.T) {
+		t.Setenv("UWCL_GRPC_CLIENT_ADDRESS", "localhost:50051")
+		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg.GRPC)
+		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["uwcl"].Address)
+	})
+}
