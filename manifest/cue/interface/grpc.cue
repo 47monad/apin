@@ -14,7 +14,7 @@ import (
 }
 
 #GRPCClient: {
-  address: string
+  address: *"" | string
 }
 
 #GRPC: {
