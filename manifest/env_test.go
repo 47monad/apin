@@ -15,68 +15,40 @@ func TestLoadEnvFile(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// Create a temporary .env file for testing
 	t.Run("load_env/ok", func(t *testing.T) {
 		content := `
 		TEST_ENV=test
 		`
 		tmpFile, err := os.CreateTemp("", "test*.env")
 		require.NoError(t, err)
-		defer os.Remove(tmpFile.Name())
+		t.Cleanup(func() { os.Remove(tmpFile.Name()) })
 
 		_, err = tmpFile.WriteString(content)
 		require.NoError(t, err)
 		tmpFile.Close()
 
+		orig, had := os.LookupEnv("TEST_ENV")
+		t.Cleanup(func() {
+			if had {
+				os.Setenv("TEST_ENV", orig)
+			} else {
+				os.Unsetenv("TEST_ENV")
+			}
+		})
+
 		err = manifest.LoadEnvFile(tmpFile.Name())
 		assert.NoError(t, err)
 
 		assert.Equal(t, "test", os.Getenv("TEST_ENV"))
-
-		os.Unsetenv("TEST_ENV")
 	})
 }
 
 func TestLoadEnvVars(t *testing.T) {
-	// Setup helper function to reset env vars after each test
-	resetEnvVars := func() {
-		os.Unsetenv("ENV")
-		os.Unsetenv("MODE")
-		os.Unsetenv("HOST")
-		os.Unsetenv("LOG_LEVEL")
-		os.Unsetenv("MONGODB_URI")
-		os.Unsetenv("MONGODB_USERNAME")
-		os.Unsetenv("MONGODB_PASSWORD")
-		os.Unsetenv("MONGODB_DBNAME")
-		os.Unsetenv("MONGODB_DB_NAME")
-		os.Unsetenv("POSTGRES_URI")
-		os.Unsetenv("POSTGRES_HOST")
-		os.Unsetenv("POSTGRES_PORT")
-		os.Unsetenv("POSTGRES_USERNAME")
-		os.Unsetenv("POSTGRES_PASSWORD")
-		os.Unsetenv("POSTGRES_DB_NAME")
-		os.Unsetenv("POSTGRES_SSL_MODE")
-		os.Unsetenv("POSTGRES_APP_NAME")
-		os.Unsetenv("POSTGRES_CONN_TIMEOUT")
-		os.Unsetenv("POSTGRES_MODE")
-		os.Unsetenv("POSTGRES_POOL_MAX_CONNS")
-		os.Unsetenv("POSTGRES_POOL_MIN_CONNS")
-		os.Unsetenv("POSTGRES_POOL_MAX_CONN_LIFETIME")
-		os.Unsetenv("POSTGRES_POOL_MAX_CONN_IDLE_TIME")
-		os.Unsetenv("POSTGRES_POOL_HEALTH_CHECK_INTERVAL")
-		os.Unsetenv("RABBITMQ_URI")
-		os.Unsetenv("MAIN_GRPC_PORT")
-		os.Unsetenv("MAIN_GRPC_CLIENT_ADDRESS")
-		os.Unsetenv("MAIN_HTTP_PORT")
-	}
-
 	t.Run("load_basic_vars/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("ENV", "test")
-		os.Setenv("MODE", "debug")
-		os.Setenv("HOST", "localhost")
-		os.Setenv("LOG_LEVEL", "info")
+		t.Setenv("ENV", "test")
+		t.Setenv("MODE", "debug")
+		t.Setenv("HOST", "localhost")
+		t.Setenv("LOG_LEVEL", "info")
 
 		cfg := &manifest.Config{
 			Name:    "test-app",
@@ -95,14 +67,12 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("load_nested_vars/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("LOG_LEVEL", "debug")
-		os.Setenv("MONGODB_URI", "mongodb://localhost:27017")
-		os.Setenv("MONGODB_USERNAME", "testuser")
-		os.Setenv("MONGODB_PASSWORD", "testpass")
-		os.Setenv("MONGODB_DBNAME", "testdb")
-		os.Setenv("POSTGRES_URI", "postgres://localhost:2134")
+		t.Setenv("LOG_LEVEL", "debug")
+		t.Setenv("MONGODB_URI", "mongodb://localhost:27017")
+		t.Setenv("MONGODB_USERNAME", "testuser")
+		t.Setenv("MONGODB_PASSWORD", "testpass")
+		t.Setenv("MONGODB_DBNAME", "testdb")
+		t.Setenv("POSTGRES_URI", "postgres://localhost:2134")
 
 		cfg := &manifest.Config{
 			Name:     "test-app",
@@ -127,9 +97,7 @@ func TestLoadEnvVars(t *testing.T) {
 	// MONGODB_DB_NAME is the standardized name; the legacy MONGODB_DBNAME
 	// is covered by load_nested_vars/ok above.
 	t.Run("load_new_db_name_var/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("MONGODB_DB_NAME", "testdb")
+		t.Setenv("MONGODB_DB_NAME", "testdb")
 
 		cfg := &manifest.Config{
 			Mongodb: &manifest.MongodbConfig{},
@@ -142,22 +110,20 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("load_postgres_vars/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("POSTGRES_HOST", "localhost")
-		os.Setenv("POSTGRES_PORT", "5432")
-		os.Setenv("POSTGRES_USERNAME", "postgres")
-		os.Setenv("POSTGRES_PASSWORD", "secret")
-		os.Setenv("POSTGRES_DB_NAME", "testdb")
-		os.Setenv("POSTGRES_SSL_MODE", "require")
-		os.Setenv("POSTGRES_APP_NAME", "test-app")
-		os.Setenv("POSTGRES_CONN_TIMEOUT", "5")
-		os.Setenv("POSTGRES_MODE", "single")
-		os.Setenv("POSTGRES_POOL_MAX_CONNS", "10")
-		os.Setenv("POSTGRES_POOL_MIN_CONNS", "2")
-		os.Setenv("POSTGRES_POOL_MAX_CONN_LIFETIME", "300")
-		os.Setenv("POSTGRES_POOL_MAX_CONN_IDLE_TIME", "60")
-		os.Setenv("POSTGRES_POOL_HEALTH_CHECK_INTERVAL", "30")
+		t.Setenv("POSTGRES_HOST", "localhost")
+		t.Setenv("POSTGRES_PORT", "5432")
+		t.Setenv("POSTGRES_USERNAME", "postgres")
+		t.Setenv("POSTGRES_PASSWORD", "secret")
+		t.Setenv("POSTGRES_DB_NAME", "testdb")
+		t.Setenv("POSTGRES_SSL_MODE", "require")
+		t.Setenv("POSTGRES_APP_NAME", "test-app")
+		t.Setenv("POSTGRES_CONN_TIMEOUT", "5")
+		t.Setenv("POSTGRES_MODE", "single")
+		t.Setenv("POSTGRES_POOL_MAX_CONNS", "10")
+		t.Setenv("POSTGRES_POOL_MIN_CONNS", "2")
+		t.Setenv("POSTGRES_POOL_MAX_CONN_LIFETIME", "300")
+		t.Setenv("POSTGRES_POOL_MAX_CONN_IDLE_TIME", "60")
+		t.Setenv("POSTGRES_POOL_HEALTH_CHECK_INTERVAL", "30")
 
 		cfg := &manifest.Config{
 			Postgres: &manifest.PostgresConfig{},
@@ -186,9 +152,7 @@ func TestLoadEnvVars(t *testing.T) {
 	// An optional section absent from the CUE file is allocated when a
 	// matching environment variable is present.
 	t.Run("postgres_section_allocated_from_env/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("POSTGRES_URI", "postgres://localhost:2134/testdb")
+		t.Setenv("POSTGRES_URI", "postgres://localhost:2134/testdb")
 
 		cfg := &manifest.Config{
 			// Postgres is nil
@@ -202,8 +166,6 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("postgres_section_not_allocated_without_env/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
 		cfg := &manifest.Config{}
 
 		err := manifest.LoadEnvVars(cfg)
@@ -213,9 +175,7 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("postgres_env_var_validation/error", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("POSTGRES_MODE", "garbage")
+		t.Setenv("POSTGRES_MODE", "garbage")
 
 		cfg := &manifest.Config{
 			Postgres: &manifest.PostgresConfig{},
@@ -226,11 +186,28 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid mode")
 	})
 
-	t.Run("load_numeric_vars/ok", func(t *testing.T) {
-		defer resetEnvVars()
+	t.Run("load_etcd_vars/ok", func(t *testing.T) {
+		t.Setenv("ETCD_ENDPOINTS", "127.0.0.1:2379,127.0.0.1:2479")
+		t.Setenv("ETCD_USERNAME", "root")
+		t.Setenv("ETCD_PASSWORD", "secret")
+		t.Setenv("ETCD_TIMEOUT", "5")
 
-		os.Setenv("MAIN_GRPC_PORT", "50051")
-		os.Setenv("MAIN_HTTP_PORT", "8080")
+		cfg := &manifest.Config{
+			Etcd: &manifest.EtcdConfig{},
+		}
+
+		err := manifest.LoadEnvVars(cfg)
+		require.NoError(t, err)
+
+		assert.Equal(t, "127.0.0.1:2379,127.0.0.1:2479", cfg.Etcd.Endpoints)
+		assert.Equal(t, "root", cfg.Etcd.Username)
+		assert.Equal(t, "secret", cfg.Etcd.Password)
+		assert.Equal(t, 5, cfg.Etcd.Timeout)
+	})
+
+	t.Run("load_numeric_vars/ok", func(t *testing.T) {
+		t.Setenv("MAIN_GRPC_PORT", "50051")
+		t.Setenv("MAIN_HTTP_PORT", "8080")
 
 		cfg := &manifest.Config{
 			Name:    "test-app",
@@ -248,9 +225,7 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("invalid_numeric_var/error", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("MAIN_HTTP_PORT", "not-a-number")
+		t.Setenv("MAIN_HTTP_PORT", "not-a-number")
 
 		cfg := &manifest.Config{
 			HTTP: &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
@@ -264,9 +239,7 @@ func TestLoadEnvVars(t *testing.T) {
 	// TODO: Test Boolean vars. currently no boolean env var exist
 
 	t.Run("map_fields/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("SERVICE1_GRPC_CLIENT_ADDRESS", "localhost:50051")
+		t.Setenv("SERVICE1_GRPC_CLIENT_ADDRESS", "localhost:50051")
 
 		cfg := &manifest.Config{
 			GRPC: &manifest.GRPCConfig{
@@ -282,19 +255,17 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("full/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("ENV", "production")
-		os.Setenv("MODE", "release")
-		os.Setenv("HOST", "0.0.0.0")
-		os.Setenv("LOG_LEVEL", "info")
-		os.Setenv("MONGODB_URI", "mongodb://mongo:27017")
-		os.Setenv("MONGODB_USERNAME", "produser")
-		os.Setenv("MONGODB_PASSWORD", "prodpass")
-		os.Setenv("MONGODB_DBNAME", "proddb")
-		os.Setenv("RABBITMQ_URI", "amqp://guest:guest@rabbitmq:5672/")
-		os.Setenv("MAIN_GRPC_PORT", "5000")
-		os.Setenv("MAIN_HTTP_PORT", "8000")
+		t.Setenv("ENV", "production")
+		t.Setenv("MODE", "release")
+		t.Setenv("HOST", "0.0.0.0")
+		t.Setenv("LOG_LEVEL", "info")
+		t.Setenv("MONGODB_URI", "mongodb://mongo:27017")
+		t.Setenv("MONGODB_USERNAME", "produser")
+		t.Setenv("MONGODB_PASSWORD", "prodpass")
+		t.Setenv("MONGODB_DBNAME", "proddb")
+		t.Setenv("RABBITMQ_URI", "amqp://guest:guest@rabbitmq:5672/")
+		t.Setenv("MAIN_GRPC_PORT", "5000")
+		t.Setenv("MAIN_HTTP_PORT", "8000")
 
 		cfg := &manifest.Config{
 			Name:    "prod-app",
@@ -324,9 +295,7 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("nil_pointer_in_config/ok", func(t *testing.T) {
-		defer resetEnvVars()
-
-		os.Setenv("MONGODB_URI", "mongodb://localhost:27017")
+		t.Setenv("MONGODB_URI", "mongodb://localhost:27017")
 
 		cfg := &manifest.Config{
 			Name:    "test-app",
