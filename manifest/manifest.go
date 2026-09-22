@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/build"
 	"cuelang.org/go/cue/cuecontext"
 	cueload "cuelang.org/go/cue/load"
 )
@@ -45,13 +46,21 @@ func Build(configPath, envPath string) (*Config, error) {
 		Dir:     "./cue/",
 		Overlay: overlay,
 	})
-	defaultIns := cuectx.BuildInstance(ins[0])
+	schemaInst, err := firstInstance(ins, "embedded schema")
+	if err != nil {
+		return nil, err
+	}
+	defaultIns := cuectx.BuildInstance(schemaInst)
 	if defaultIns.Err() != nil {
 		return nil, defaultIns.Err()
 	}
 
 	ins2 := cueload.Instances([]string{configPath}, nil)
-	userIns := cuectx.BuildInstance(ins2[0])
+	userInst, err := firstInstance(ins2, "user config")
+	if err != nil {
+		return nil, err
+	}
+	userIns := cuectx.BuildInstance(userInst)
 	if userIns.Err() != nil {
 		return nil, userIns.Err()
 	}
@@ -107,4 +116,15 @@ func getOverlay(fsys fs.FS) (map[string]cueload.Source, error) {
 		return overlay, fmt.Errorf("walkdir: %w", err)
 	}
 	return overlay, nil
+}
+
+// firstInstance returns ins[0], or an error if the load produced nothing.
+func firstInstance(ins []*build.Instance, what string) (*build.Instance, error) {
+	if len(ins) == 0 {
+		return nil, fmt.Errorf("no CUE instances loaded for %s", what)
+	}
+	if ins[0] == nil {
+		return nil, fmt.Errorf("nil CUE instance for %s", what)
+	}
+	return ins[0], nil
 }
