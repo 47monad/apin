@@ -31,7 +31,9 @@ func New(configPath, envPath string) (*Config, error) {
 
 func Build(configPath, envPath string) (*Config, error) {
 	if _, err := os.Stat(envPath); err == nil {
-		LoadEnvFile(envPath)
+		if err := LoadEnvFile(envPath); err != nil {
+			return nil, fmt.Errorf("load env file: %w", err)
+		}
 	}
 	cuectx := cuecontext.New()
 
@@ -102,7 +104,7 @@ func getOverlay(fsys fs.FS) (map[string]cueload.Source, error) {
 			return nil
 		},
 	); err != nil {
-		return overlay, fmt.Errorf("walkdir: %v", err)
+		return overlay, fmt.Errorf("walkdir: %w", err)
 	}
 	return overlay, nil
 }

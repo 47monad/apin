@@ -146,3 +146,31 @@ func TestPostgresCUESchema(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestBuildLoadEnvFileError(t *testing.T) {
+	t.Run("malformed_env/error", func(t *testing.T) {
+		dir := t.TempDir()
+		path := dir + "/bad.env"
+		require.NoError(t, os.WriteFile(path, []byte("FOO=\"unterminated\n"), 0o644))
+
+		cfg, err := manifest.Build("./testdata/main.cue", path)
+		require.Error(t, err)
+		require.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "load env file")
+	})
+
+	t.Run("env_path_is_directory/error", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg, err := manifest.Build("./testdata/main.cue", dir)
+		require.Error(t, err)
+		require.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "load env file")
+	})
+
+	t.Run("missing_env/ok", func(t *testing.T) {
+		cfg, err := manifest.Build("./testdata/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		assert.Equal(t, "test", cfg.Name)
+	})
+}
