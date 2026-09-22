@@ -27,6 +27,58 @@ func TestZaal(t *testing.T) {
 	fmt.Println(string(js))
 }
 
+func TestNew(t *testing.T) {
+	tests := []struct {
+		name       string
+		configPath string
+		envPath    string
+		wantName   string
+		wantErr    bool
+	}{
+		{
+			name:       "success",
+			configPath: "./testdata/main.cue",
+			envPath:    "./testdata/main.env",
+			wantName:   "test",
+		},
+		{
+			name:       "bad_manifest_path",
+			configPath: "nonexistent.cue",
+			envPath:    "nonexistent.env",
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := manifest.New(tt.configPath, tt.envPath)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, cfg)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			assert.Equal(t, tt.wantName, cfg.Name)
+		})
+	}
+}
+
+func TestMustNew(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cfg := manifest.MustNew("./testdata/main.cue", "./testdata/main.env")
+		require.NotNil(t, cfg)
+		assert.Equal(t, "test", cfg.Name)
+	})
+	t.Run("bad_manifest_path_panics", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("MustNew() did not panic on bad manifest path")
+			}
+		}()
+		_ = manifest.MustNew("nonexistent.cue", "nonexistent.env")
+	})
+}
+
 func TestPostgresCUESchema(t *testing.T) {
 	// Build loads env files into the process environment, which leaks
 	// across tests (issue #31). Clear postgres vars so fixtures get a
