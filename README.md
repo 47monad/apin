@@ -161,8 +161,12 @@ tests or custom lifecycles.
 
 The `runner` package still works on its own for concurrent multi-server
 setups (`runner.AddGRPCServer`, `AddHTTPServer`, `AddHealthCheck`) — pass
-`runner.Run` as the App's runnable (wrap it in a `func(ctx)` that ignores the
-context), or use `ServerShell.Serve` for the single-server case shown above.
+`runner.Run` as the App's runnable, handing it the App's context so the App's
+signal handling drives the runner's graceful shutdown, or use
+`ServerShell.Serve` for the single-server case shown above. Servers
+registered with the runner are drained by `runner.Stop`: in-flight requests
+and RPCs finish before the listener closes, and the SIGINT/SIGTERM wiring is
+documented in the package doc.
 
 ## Configuration
 
@@ -188,7 +192,7 @@ Initrs can also be configured without any config file, using options only.
 - `manifest/` — the service manifest: CUE schema, section structs, env
   overlay, and the `LoadConfig` machinery (inlined from the former zaal repo)
 - `closr/` — the `Closer` alias, kept for compatibility
-- `runner/` — errgroup-based concurrent runner
+- `runner/` — errgroup-based concurrent runner with graceful server shutdown
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
 
