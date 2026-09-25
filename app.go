@@ -82,6 +82,26 @@ func (app *App) Logger() logr.Logger {
 	return app.logger
 }
 
+// SetShutdownTimeout bounds the shutdown phase performed by Run. It is the
+// post-construction counterpart of the WithShutdownTimeout NewApp option, for
+// apps built with New. Non-positive values restore the 30s default.
+func (app *App) SetShutdownTimeout(timeout time.Duration) *App {
+	if timeout <= 0 {
+		timeout = defaultShutdownTimeout
+	}
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	app.shutdownTimeout = timeout
+	return app
+}
+
+// ShutdownTimeout reports the bound Run puts on its shutdown phase.
+func (app *App) ShutdownTimeout() time.Duration {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	return app.shutdownTimeout
+}
+
 // Runnable is a long-running unit of work. It must return promptly once its
 // context is done.
 type Runnable func(ctx context.Context) error
@@ -121,7 +141,7 @@ func (app *App) Run(ctx context.Context, runnables ...Runnable) error {
 	defer close(stop)
 	app.watchForceExit(stop)
 
-	closeCtx, cancel := context.WithTimeout(context.Background(), app.shutdownTimeout)
+	closeCtx, cancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
 	defer cancel()
 	closeErr := app.Close(closeCtx)
 
