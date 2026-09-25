@@ -27,6 +27,58 @@ func TestZaal(t *testing.T) {
 	fmt.Println(string(js))
 }
 
+func TestNew(t *testing.T) {
+	tests := []struct {
+		name       string
+		configPath string
+		envPath    string
+		wantName   string
+		wantErr    bool
+	}{
+		{
+			name:       "success",
+			configPath: "./testdata/main.cue",
+			envPath:    "./testdata/main.env",
+			wantName:   "test",
+		},
+		{
+			name:       "bad_manifest_path",
+			configPath: "nonexistent.cue",
+			envPath:    "nonexistent.env",
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := manifest.New(tt.configPath, tt.envPath)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, cfg)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			assert.Equal(t, tt.wantName, cfg.Name)
+		})
+	}
+}
+
+func TestMustNew(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		cfg := manifest.MustNew("./testdata/main.cue", "./testdata/main.env")
+		require.NotNil(t, cfg)
+		assert.Equal(t, "test", cfg.Name)
+	})
+	t.Run("bad_manifest_path_panics", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("MustNew() did not panic on bad manifest path")
+			}
+		}()
+		_ = manifest.MustNew("nonexistent.cue", "nonexistent.env")
+	})
+}
+
 func TestPostgresCUESchema(t *testing.T) {
 	// Build loads env files into the process environment, which leaks
 	// across tests (issue #31). Clear postgres vars so fixtures get a
@@ -92,5 +144,58 @@ func TestPostgresCUESchema(t *testing.T) {
 	t.Run("bad_pool_conns/error", func(t *testing.T) {
 		_, err := manifest.Build("./testdata/postgres_bad_pool/main.cue", "nonexistent.env")
 		assert.Error(t, err)
+	})
+}
+
+func TestBuildLoadEnvFileError(t *testing.T) {
+	t.Run("malformed_env/error", func(t *testing.T) {
+		dir := t.TempDir()
+		path := dir + "/bad.env"
+		require.NoError(t, os.WriteFile(path, []byte("FOO=\"unterminated\n"), 0o644))
+
+		cfg, err := manifest.Build("./testdata/main.cue", path)
+		require.Error(t, err)
+		require.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "load env file")
+	})
+
+	t.Run("env_path_is_directory/error", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg, err := manifest.Build("./testdata/main.cue", dir)
+		require.Error(t, err)
+		require.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "load env file")
+	})
+
+	t.Run("missing_env/ok", func(t *testing.T) {
+		cfg, err := manifest.Build("./testdata/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		assert.Equal(t, "test", cfg.Name)
+  })
+}
+
+func TestGRPCClientAddressDefault(t *testing.T) {
+	// Build loads env files into the process environment. Clear client
+	// address vars so the empty CUE default is what we observe.
+	for _, name := range []string{"UWCL_GRPC_CLIENT_ADDRESS", "GRPC_CLIENT_ADDRESS"} {
+		os.Unsetenv(name)
+	}
+
+	t.Run("empty_client_uses_default_address/ok", func(t *testing.T) {
+		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg.GRPC)
+		client, ok := cfg.GRPC.Clients["uwcl"]
+		require.True(t, ok)
+		assert.Equal(t, "", client.Address)
+	})
+
+	t.Run("env_overrides_default_address/ok", func(t *testing.T) {
+		t.Setenv("UWCL_GRPC_CLIENT_ADDRESS", "localhost:50051")
+		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
+		require.NoError(t, err)
+		require.NotNil(t, cfg.GRPC)
+		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["uwcl"].Address)
 	})
 }

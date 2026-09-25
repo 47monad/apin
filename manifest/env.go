@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -19,6 +20,9 @@ func LoadEnvFile(path string) error {
 }
 
 func LoadEnvVars(cfg *Config) error {
+	if cfg == nil {
+		return errors.New("config is nil")
+	}
 	ensureOptionalSections(cfg)
 
 	val := reflect.ValueOf(cfg).Elem()

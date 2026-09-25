@@ -44,6 +44,45 @@ func TestLoadEnvFile(t *testing.T) {
 }
 
 func TestLoadEnvVars(t *testing.T) {
+
+	t.Run("nil_config/error", func(t *testing.T) {
+		err := manifest.LoadEnvVars(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nil")
+	})
+
+	// Setup helper function to reset env vars after each test
+	resetEnvVars := func() {
+		os.Unsetenv("ENV")
+		os.Unsetenv("MODE")
+		os.Unsetenv("HOST")
+		os.Unsetenv("LOG_LEVEL")
+		os.Unsetenv("MONGODB_URI")
+		os.Unsetenv("MONGODB_USERNAME")
+		os.Unsetenv("MONGODB_PASSWORD")
+		os.Unsetenv("MONGODB_DBNAME")
+		os.Unsetenv("MONGODB_DB_NAME")
+		os.Unsetenv("POSTGRES_URI")
+		os.Unsetenv("POSTGRES_HOST")
+		os.Unsetenv("POSTGRES_PORT")
+		os.Unsetenv("POSTGRES_USERNAME")
+		os.Unsetenv("POSTGRES_PASSWORD")
+		os.Unsetenv("POSTGRES_DB_NAME")
+		os.Unsetenv("POSTGRES_SSL_MODE")
+		os.Unsetenv("POSTGRES_APP_NAME")
+		os.Unsetenv("POSTGRES_CONN_TIMEOUT")
+		os.Unsetenv("POSTGRES_MODE")
+		os.Unsetenv("POSTGRES_POOL_MAX_CONNS")
+		os.Unsetenv("POSTGRES_POOL_MIN_CONNS")
+		os.Unsetenv("POSTGRES_POOL_MAX_CONN_LIFETIME")
+		os.Unsetenv("POSTGRES_POOL_MAX_CONN_IDLE_TIME")
+		os.Unsetenv("POSTGRES_POOL_HEALTH_CHECK_INTERVAL")
+		os.Unsetenv("RABBITMQ_URI")
+		os.Unsetenv("MAIN_GRPC_PORT")
+		os.Unsetenv("MAIN_GRPC_CLIENT_ADDRESS")
+		os.Unsetenv("MAIN_HTTP_PORT")
+	}
+
 	t.Run("load_basic_vars/ok", func(t *testing.T) {
 		t.Setenv("ENV", "test")
 		t.Setenv("MODE", "debug")
