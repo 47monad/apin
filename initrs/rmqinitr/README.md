@@ -12,11 +12,11 @@ go get github.com/47monad/apin/initrs/rmqinitr
 
 ```go
 // config-file driven
-mqShell, err := rmqinitr.New(ctx, rmqinitr.WithConfig(cfg.RabbiMQ))
+mqShell, err := rmqinitr.New(ctx, rmqinitr.WithConfig(cfg.RabbitMQ))
 
 // config file + overrides
 mqShell, err := rmqinitr.New(ctx,
-	rmqinitr.WithConfig(cfg.RabbiMQ),
+	rmqinitr.WithConfig(cfg.RabbitMQ),
 	rmqinitr.WithLogger(logger),
 )
 
