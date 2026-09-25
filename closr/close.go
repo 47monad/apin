@@ -32,6 +32,11 @@ func Close(closer Closer, opts ...Option) error {
 	return closer.Close(_opts.ctx)
 }
 
+// MustClose closes closer and panics if it fails, following the same
+// convention as the other Must* helpers in this repo. Use it for cleanup
+// that must not be silently skipped (deferred teardown, test setup).
 func MustClose(closer Closer, opts ...Option) {
-	_ = Close(closer, opts...)
+	if err := Close(closer, opts...); err != nil {
+		panic(err)
+	}
 }
