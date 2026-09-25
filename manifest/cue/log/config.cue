@@ -1,11 +1,9 @@
 package log
 
-#Level: "error" | "fatal" | "warn" |"info" | "debug"
+#Level: "error" | "fatal" | "warn" | "info" | "debug"
 
 #Config: {
-    level: #Level
-}
-
-config: {
   level: *"error" | #Level
 }
+
+config: #Config

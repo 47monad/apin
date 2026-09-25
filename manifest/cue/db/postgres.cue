@@ -1,6 +1,6 @@
 package db
 
-import "github.com/47monad/apin/manifest/cue/common@v0"
+import "github.com/47monad/apin/manifest/cue/common"
 
 #Pool: {
   maxConns?:            int & >=1

@@ -1,7 +1,7 @@
 package interface
 
 import (
-  "github.com/47monad/apin/manifest/cue/common@v0"
+  "github.com/47monad/apin/manifest/cue/common"
 )
 
 #HTTPServer: {
