@@ -21,9 +21,11 @@ func WithConfig(configPath string) Option {
 	}
 }
 
-// WithEnv points New at an optional .env file. It is loaded before the
-// manifest is parsed, so its variables can override manifest values. Without
-// WithEnv no env file is loaded.
+// WithEnv points New at an optional .env file. Its variables are parsed, not
+// loaded into the process environment, and overlay the manifest once all
+// options have run — so WithEnv takes effect regardless of option order.
+// Variables already set in the process environment win over the file, and
+// both win over the manifest. Without WithEnv no env file is read.
 func WithEnv(envPath string) Option {
 	return func(a *App) error {
 		a.envPath = envPath

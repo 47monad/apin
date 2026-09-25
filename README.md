@@ -202,6 +202,11 @@ pginitr.New(ctx,
 )
 ```
 
+Values from a `.env` file are parsed into an isolated set, never written to
+the process environment, so concurrent `apin.New` calls cannot interfere with
+each other. Precedence runs process environment > `.env` file > manifest, so
+an exported variable always beats a file entry.
+
 Initrs can also be configured without any config file, using options only. A
 program that wants the manifest without an `App` can call
 `apin.LoadConfig(configPath, envPath)` (or `MustLoadConfig`) directly.

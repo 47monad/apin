@@ -30,11 +30,19 @@ func New(configPath, envPath string) (*Config, error) {
 	return Build(configPath, envPath)
 }
 
+// Build loads a manifest, optionally overlaying it with the variables of an
+// env file and the process environment. The env file is parsed into an
+// isolated set rather than loaded into the process environment, so concurrent
+// Build calls neither race nor observe each other's variables; the process
+// environment still wins over the file, and both win over the manifest.
 func Build(configPath, envPath string) (*Config, error) {
+	var env EnvVars
 	if _, err := os.Stat(envPath); err == nil {
-		if err := LoadEnvFile(envPath); err != nil {
+		parsed, err := ParseEnvFile(envPath)
+		if err != nil {
 			return nil, fmt.Errorf("load env file: %w", err)
 		}
+		env = parsed
 	}
 	cuectx := cuecontext.New()
 
@@ -80,7 +88,7 @@ func Build(configPath, envPath string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := LoadEnvVars(&dec); err != nil {
+	if err := env.Overlay(&dec); err != nil {
 		return nil, err
 	}
 
