@@ -38,6 +38,12 @@ func TestLoadEnvFile(t *testing.T) {
 }
 
 func TestLoadEnvVars(t *testing.T) {
+	t.Run("nil_config/error", func(t *testing.T) {
+		err := manifest.LoadEnvVars(nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nil")
+	})
+
 	// Setup helper function to reset env vars after each test
 	resetEnvVars := func() {
 		os.Unsetenv("ENV")
