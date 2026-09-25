@@ -303,14 +303,14 @@ func TestLoadEnvVars(t *testing.T) {
 		os.Setenv("MAIN_HTTP_PORT", "8000")
 
 		cfg := &manifest.Config{
-			Name:    "prod-app",
-			Title:   "Production App",
-			Version: "1.0.0",
-			Logging: manifest.LoggingConfig{},
-			Mongodb: &manifest.MongodbConfig{},
-			RabbiMQ: &manifest.RabbitMQConfig{},
-			GRPC:    &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
-			HTTP:    &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
+			Name:     "prod-app",
+			Title:    "Production App",
+			Version:  "1.0.0",
+			Logging:  manifest.LoggingConfig{},
+			Mongodb:  &manifest.MongodbConfig{},
+			RabbitMQ: &manifest.RabbitMQConfig{},
+			GRPC:     &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
+			HTTP:     &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
 		}
 
 		err := manifest.LoadEnvVars(cfg)
@@ -324,7 +324,7 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "produser", cfg.Mongodb.Username)
 		assert.Equal(t, "prodpass", cfg.Mongodb.Password)
 		assert.Equal(t, "proddb", cfg.Mongodb.DBName)
-		assert.Equal(t, "amqp://guest:guest@rabbitmq:5672/", cfg.RabbiMQ.URI)
+		assert.Equal(t, "amqp://guest:guest@rabbitmq:5672/", cfg.RabbitMQ.URI)
 		assert.Equal(t, 5000, cfg.GRPC.Servers["main"].Port)
 		assert.Equal(t, 8000, cfg.HTTP.Servers["main"].Port)
 	})

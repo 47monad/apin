@@ -95,7 +95,7 @@ type Config struct {
 	Mongodb    *MongodbConfig    `json:"mongodb,omitempty"`
 	Postgres   *PostgresConfig   `json:"postgres,omitempty"`
 	Etcd       *EtcdConfig       `json:"etcd,omitempty"`
-	RabbiMQ    *RabbitMQConfig   `json:"rabbitmq,omitempty"`
+	RabbitMQ   *RabbitMQConfig   `json:"rabbitmq,omitempty"`
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty"`
 	GRPC       *GRPCConfig       `json:"grpc,omitempty"`
 	HTTP       *HTTPConfig       `json:"http,omitempty"`
