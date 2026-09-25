@@ -82,8 +82,9 @@ func (app *App) SetLogger(logger logr.Logger) {
 }
 
 // RegisterLogger installs the logger of a logger initr shell (e.g. a
-// zapinitr Shell) as the app logger. It is the post-construction counterpart
-// of the WithLogger NewApp option.
+// zapinitr Shell) as the app logger. Logger initrs need the config that New
+// loads, so they can only be built after construction — this is the
+// post-construction counterpart of the WithLogger NewApp option.
 func (app *App) RegisterLogger(shell *LoggerShell) {
 	if shell == nil {
 		return

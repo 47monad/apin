@@ -110,6 +110,61 @@ func TestRunReturnsRunnableError(t *testing.T) {
 	}
 }
 
+// slowCloser blocks in Close until its context is done, so a shutdown
+// deadline is what releases it.
+type slowCloser struct{}
+
+func (slowCloser) Close(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func TestSetShutdownTimeout(t *testing.T) {
+	app := apin.NewApp()
+	if got, want := app.ShutdownTimeout(), 30*time.Second; got != want {
+		t.Errorf("default ShutdownTimeout() = %v, want %v", got, want)
+	}
+
+	if got := app.SetShutdownTimeout(50 * time.Millisecond).ShutdownTimeout(); got != 50*time.Millisecond {
+		t.Errorf("ShutdownTimeout() = %v, want %v", got, 50*time.Millisecond)
+	}
+	// Non-positive values fall back to the default rather than closing with
+	// an already-expired context.
+	if got := app.SetShutdownTimeout(0).ShutdownTimeout(); got != 30*time.Second {
+		t.Errorf("ShutdownTimeout() after SetShutdownTimeout(0) = %v, want %v", got, 30*time.Second)
+	}
+}
+
+func TestSetShutdownTimeoutBoundsShutdownPhase(t *testing.T) {
+	var records []string
+	mu := &sync.Mutex{}
+
+	app := apin.NewApp()
+	app.SetShutdownTimeout(50 * time.Millisecond)
+	app.Track(
+		&fakeShell{id: "fast", records: &records, mu: mu},
+		slowCloser{},
+		&fakeShell{id: "after", records: &records, mu: mu},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	err := app.Run(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Run() error = %v, want the shutdown deadline exceeded", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("Run() took %v, want it bounded by the shutdown timeout", elapsed)
+	}
+	// Shells close in reverse tracking order, and the slow shell is only
+	// released by the deadline, so the one after it still gets closed.
+	if len(records) != 2 || records[0] != "after" || records[1] != "fast" {
+		t.Errorf("close order = %v, want [after fast]", records)
+	}
+}
+
 func TestRunStopsOnSignal(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("signal self-delivery requires unix")

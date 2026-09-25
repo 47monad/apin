@@ -43,17 +43,23 @@ import (
 func main() {
 	ctx := context.Background()
 
-	cfg, err := apin.LoadConfig("config.json", ".env") // apin parses the config file
+	// apin parses the config file; the .env file is optional.
+	app, err := apin.New(
+		apin.WithConfig("config.json"),
+		apin.WithEnv(".env"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg := app.Config()
 
+	// The logger initr needs the config, and the config is loaded by
+	// apin.New — so the app logger is registered after construction.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	app := apin.NewApp(apin.WithLogger(loggerShell.Logger))
+	app.RegisterLogger(loggerShell)
 
 	dbShell, err := pginitr.New(ctx,
 		pginitr.WithConfig(cfg.Postgres), // config file values...
@@ -95,8 +101,8 @@ SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
 order.
 
 A complete runnable version of this lives in
-[`examples/grpcsvc`](examples/grpcsvc) — including a `config.json` for
-`apin.LoadConfig`.
+[`examples/grpcsvc`](examples/grpcsvc) — including the `config.json` that
+`apin.WithConfig` reads.
 
 ## The Shell Law
 
@@ -111,7 +117,7 @@ Every initr follows the same contract, so any service reads the same way:
 3. **Options.** Functional options (`Option func(*Store) error`) are applied
    in order; later options win.
 4. **Config entry point.** `WithConfig(*manifest.XConfig)` is the config-file
-   path (the section types come from `apin.LoadConfig`). Individual `With*`
+   path (the section types come from `app.Config()`). Individual `With*`
    options override single fields on top of it:
    ```go
    pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres), pginitr.WithPort(6543))
@@ -146,14 +152,18 @@ Every initr follows the same contract, so any service reads the same way:
 `apin.App` owns the shutdown:
 
 ```go
-app := apin.NewApp(apin.WithLogger(loggerShell.Logger))
+app, err := apin.New(apin.WithConfig("config.json"))
+if err != nil {
+	log.Fatal(err)
+}
+app.RegisterLogger(loggerShell)
 defer app.Close(context.Background()) // manual lifecycle control
 ```
 
 - `app.Track(shell...)` — record shells for cleanup (call it right after each `New`)
 - `app.Run(ctx, runnables...)` — start serving; on SIGINT/SIGTERM or context
   cancellation, runnables are cancelled and shells closed in reverse order,
-  bounded by a shutdown timeout (default 30s)
+  bounded by a shutdown timeout (default 30s, `app.SetShutdownTimeout` to tune)
 - A second signal forces an immediate exit
 
 `app.Close(ctx)` alone closes tracked shells in reverse order — useful for
@@ -170,12 +180,21 @@ documented in the package doc.
 
 ## Configuration
 
-The service manifest is a CUE-validated, env-overridable config loaded with
-`apin.LoadConfig` — the returned struct's sections (postgres, grpc, http,
-...) feed straight into initr `WithConfig` calls. Programmatic `With*`
+The service manifest is a CUE-validated, env-overridable config loaded by
+`apin.New` and read back with `app.Config()` — its sections (postgres, grpc,
+http, ...) feed straight into initr `WithConfig` calls. Programmatic `With*`
 options compose with it, field by field:
 
 ```go
+app, err := apin.New(
+	apin.WithConfig("config.json"), // CUE/JSON manifest
+	apin.WithEnv(".env"),           // optional; overrides manifest values
+)
+if err != nil {
+	log.Fatal(err)
+}
+cfg := app.Config() // nil when apin.New was called without WithConfig
+
 pginitr.New(ctx,
 	pginitr.WithConfig(cfg.Postgres), // from the config file
 	pginitr.WithMode(pginitr.ModeConn), // override: single connection
@@ -183,12 +202,14 @@ pginitr.New(ctx,
 )
 ```
 
-Initrs can also be configured without any config file, using options only.
+Initrs can also be configured without any config file, using options only. A
+program that wants the manifest without an `App` can call
+`apin.LoadConfig(configPath, envPath)` (or `MustLoadConfig`) directly.
 
 ## Repository Layout
 
-- `common.go`, `app.go`, `config.go` — apin core (`LoggerShell`, `Closer`,
-  `App`, config loading)
+- `common.go`, `app.go`, `bootstrap.go`, `config.go` — apin core (`LoggerShell`,
+  `Closer`, `App`, `apin.New` and config loading)
 - `manifest/` — the service manifest: CUE schema, section structs, env
   overlay, and the `LoadConfig` machinery (inlined from the former zaal repo)
 - `closr/` — the `Closer` alias, kept for compatibility

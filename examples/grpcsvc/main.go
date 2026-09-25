@@ -1,5 +1,6 @@
-// Package main is a minimal apin service: a service manifest config file,
-// three initrs (logging, postgres, grpc), and an apin.App owning the lifecycle.
+// Package main is a minimal apin service: apin.New loads the service
+// manifest, three initrs (logging, postgres, grpc) turn its config sections
+// into shells, and the apin.App it returned owns the lifecycle.
 //
 // Run it with a local postgres matching config.json; SIGINT/SIGTERM shut
 // everything down in reverse initialization order.
@@ -21,18 +22,23 @@ func main() {
 	ctx := context.Background()
 
 	// Parse the config file. The env file is optional.
-	cfg, err := apin.LoadConfig("config.json", ".env")
+	app, err := apin.New(
+		apin.WithConfig("config.json"),
+		apin.WithEnv(".env"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg := app.Config()
 
-	// Logger initr: cross-cutting, returns apin.LoggerShell.
+	// Logger initr: cross-cutting, returns apin.LoggerShell. It needs the
+	// config apin.New just loaded, and the app needs its logger, so the two
+	// meet here: RegisterLogger installs it after construction.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	app := apin.NewApp(apin.WithLogger(loggerShell.Logger))
+	app.RegisterLogger(loggerShell)
 
 	// Postgres: config-file values, with a per-field programmatic override.
 	dbShell, err := pginitr.New(ctx,
