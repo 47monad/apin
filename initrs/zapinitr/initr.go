@@ -21,26 +21,21 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{}
-	if err := apply(store, opts); err != nil {
-		return nil, err
-	}
-
 	config := zap.NewProductionConfig()
-	if store.Level != "" {
-		level, err := zapcore.ParseLevel(store.Level)
-		if err != nil {
-			return nil, fmt.Errorf("invalid zapinitr log level %q: %w", store.Level, err)
-		}
-		config.Level = zap.NewAtomicLevelAt(level)
-	}
-
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("Jan _2 15:04:05.000000000")
 	encoderConfig.StacktraceKey = "" // to hide stacktrace info
 	config.EncoderConfig = encoderConfig
 
-	zapLog, err := config.Build(zap.AddCallerSkip(1))
+	resolved := &resolvedConfig{zapConfig: &config}
+	if err := apply(resolved, opts); err != nil {
+		return nil, err
+	}
+	if resolved.levelErr != nil {
+		return nil, resolved.levelErr
+	}
+
+	zapLog, err := resolved.zapConfig.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build zap logger: %w", err)
 	}

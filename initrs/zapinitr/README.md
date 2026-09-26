@@ -41,6 +41,11 @@ loggerShell, err := zapinitr.New(ctx,
 `WithLevel` can override it. An empty level uses zap's production default;
 invalid levels fail construction.
 
+Options are sealed: callers can compose named options but cannot mutate
+zapinitr's private construction state. `WithNativeConfig(func(*zap.Config) error)`
+is the deliberate escape hatch for zap output, encoding, sampling, and other
+native configuration.
+
 The shell exposes a `logr.Logger` and implements
 `Close(context.Context) error`, which flushes the native zap logger. The
 application decides when the shell is closed by tracking it with `App.Track`.
