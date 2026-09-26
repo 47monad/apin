@@ -12,11 +12,19 @@ import (
 )
 
 // clearEnv empties the process environment for the duration of the test and
-// restores it afterwards. Build no longer loads env files into the process
-// environment (issue #41), but sibling tests set variables directly, so a test
-// asserting the schema defaults still has to start from a clean slate. Tests
-// in a package run sequentially, so nothing else observes the empty
-// environment.
+// restores it afterwards.
+//
+// t.Setenv cannot be used here: it can only set a value, and the overlay
+// distinguishes "unset" from "set to empty" — an empty POSTGRES_* variable
+// still counts as present when the optional postgres section is allocated, so
+// a test asserting that the section stays nil would see it allocated. Tests
+// that need a variable *set* use t.Setenv, which restores itself; this helper
+// is for the ones that need a variable *absent*.
+//
+// Build no longer loads env files into the process environment (issue #41),
+// but a test asserting the schema defaults must still be shielded from the
+// developer's own environment. Tests in a package run sequentially, so
+// nothing else observes the empty environment.
 func clearEnv(t *testing.T) {
 	t.Helper()
 	saved := os.Environ()

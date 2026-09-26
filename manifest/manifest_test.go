@@ -12,6 +12,8 @@ import (
 )
 
 func TestZaal(t *testing.T) {
+	clearEnv(t)
+
 	res, err := manifest.Build(
 		"./testdata/main.cue",
 		"./testdata/main.env",
@@ -28,6 +30,11 @@ func TestZaal(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
+	// The overlay reads the process environment, so a stray variable in the
+	// developer's shell would change the outcome — including panicking the
+	// success case below when it is a POSTGRES_* value.
+	clearEnv(t)
+
 	tests := []struct {
 		name       string
 		configPath string
@@ -64,6 +71,8 @@ func TestNew(t *testing.T) {
 }
 
 func TestMustNew(t *testing.T) {
+	clearEnv(t)
+
 	t.Run("success", func(t *testing.T) {
 		cfg := manifest.MustNew("./testdata/main.cue", "./testdata/main.env")
 		require.NotNil(t, cfg)
@@ -80,21 +89,11 @@ func TestMustNew(t *testing.T) {
 }
 
 func TestPostgresCUESchema(t *testing.T) {
-	// Build no longer loads env files into the process environment (issue
-	// #41), but sibling tests still set postgres vars directly, so clear
-	// them for a clean slate. They are unset for the process, not restored;
-	// see issue #44 for the cleanup that should replace this.
-	pgEnvVars := []string{
-		"POSTGRES_URI", "POSTGRES_HOST", "POSTGRES_PORT",
-		"POSTGRES_USERNAME", "POSTGRES_PASSWORD", "POSTGRES_DB_NAME",
-		"POSTGRES_SSL_MODE", "POSTGRES_APP_NAME", "POSTGRES_CONN_TIMEOUT",
-		"POSTGRES_MODE", "POSTGRES_POOL_MAX_CONNS", "POSTGRES_POOL_MIN_CONNS",
-		"POSTGRES_POOL_MAX_CONN_LIFETIME", "POSTGRES_POOL_MAX_CONN_IDLE_TIME",
-		"POSTGRES_POOL_HEALTH_CHECK_INTERVAL",
-	}
-	for _, name := range pgEnvVars {
-		os.Unsetenv(name)
-	}
+	// The overlay reads the process environment, so shield the fixture from
+	// whatever the developer's own shell exports. clearEnv covers every
+	// variable by construction, so a new config field cannot be missed the
+	// way a hand-maintained list eventually would.
+	clearEnv(t)
 
 	t.Run("valid_config/ok", func(t *testing.T) {
 		cfg, err := manifest.Build("./testdata/postgres/main.cue", "nonexistent.env")
@@ -149,6 +148,8 @@ func TestPostgresCUESchema(t *testing.T) {
 }
 
 func TestBuildLoadEnvFileError(t *testing.T) {
+	clearEnv(t)
+
 	t.Run("malformed_env/error", func(t *testing.T) {
 		dir := t.TempDir()
 		path := dir + "/bad.env"
@@ -173,15 +174,13 @@ func TestBuildLoadEnvFileError(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cfg)
 		assert.Equal(t, "test", cfg.Name)
-  })
+	})
 }
 
 func TestGRPCClientAddressDefault(t *testing.T) {
-	// Build loads env files into the process environment. Clear client
-	// address vars so the empty CUE default is what we observe.
-	for _, name := range []string{"UWCL_GRPC_CLIENT_ADDRESS", "GRPC_CLIENT_ADDRESS"} {
-		os.Unsetenv(name)
-	}
+	// Shield the fixture from client-address variables the developer's own
+	// environment may export, so the empty CUE default is what we observe.
+	clearEnv(t)
 
 	t.Run("empty_client_uses_default_address/ok", func(t *testing.T) {
 		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
