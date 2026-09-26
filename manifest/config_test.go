@@ -16,13 +16,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "debug", cfg.Level)
 	})
 
-	t.Run("PrometheusConfig_struct", func(t *testing.T) {
-		cfg := manifest.PrometheusConfig{
-			GRPCMetrics: true,
-		}
-		assert.True(t, cfg.GRPCMetrics)
-	})
-
 	t.Run("GRPCFeatures_struct", func(t *testing.T) {
 		features := manifest.GRPCFeatures{
 			Reflection:  true,
@@ -102,9 +95,6 @@ func TestConfigStructure(t *testing.T) {
 			Logging: manifest.LoggingConfig{
 				Level: "debug",
 			},
-			Prometheus: &manifest.PrometheusConfig{
-				GRPCMetrics: true,
-			},
 			GRPC: &manifest.GRPCConfig{
 				Clients: map[string]manifest.GRPCClientConfig{
 					"service1": {
@@ -139,9 +129,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "localhost", cfg.Host)
 		assert.Equal(t, "debug", cfg.Logging.Level)
 
-		require.NotNil(t, cfg.Prometheus)
-		assert.True(t, cfg.Prometheus.GRPCMetrics)
-
 		require.NotNil(t, cfg.GRPC)
 		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["service1"].Address)
 		assert.Equal(t, 50052, cfg.GRPC.Servers["main"].Port)
@@ -165,7 +152,6 @@ func TestConfigStructure(t *testing.T) {
 
 		assert.Equal(t, "minimal-app", cfg.Name)
 		assert.Equal(t, "Minimal Application", cfg.Title)
-		assert.Nil(t, cfg.Prometheus)
 		assert.Nil(t, cfg.GRPC)
 		assert.Nil(t, cfg.HTTP)
 	})

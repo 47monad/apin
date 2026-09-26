@@ -11,6 +11,11 @@ go get github.com/47monad/apin/initrs/prominitr
 ## Usage
 
 ```go
+type serviceConfig struct {
+	Name       string            `json:"name" yaml:"name"`
+	Prometheus *prominitr.Config `json:"prometheus" yaml:"prometheus"`
+}
+
 promShell, err := prominitr.New(ctx, prominitr.WithConfig(cfg.Prometheus))
 ```
 
@@ -25,7 +30,9 @@ promShell, err := prominitr.New(ctx)
 
 ```go
 type Shell struct {
-	Registry *prometheus.Registry
+	Registry               *prometheus.Registry
+	GRPCServerInterceptor grpc.UnaryServerInterceptor
+	GRPCServerMetrics     *grpcprom.ServerMetrics
 }
 ```
 
@@ -36,13 +43,18 @@ handler (`promhttp.HandlerFor(shell.Registry, ...)`).
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.PrometheusConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*prominitr.Config)` | apply an initializer-owned config section |
+| `WithGRPCMetrics(bool)` | enable/disable gRPC metrics configuration |
 
-`GRPCMetrics` from the config is read into the store; wiring it into
-`grpcinitr` is still pending (see the TODO in `opts.go`).
+`Config` contains the optional `GRPCMetrics` toggle. When enabled, the shell
+registers gRPC metrics in its registry and exposes both the unary interceptor
+and native `*grpcprom.ServerMetrics` handle. Applications can pass the
+interceptor to the selected gRPC server initializer with
+`grpcinitr.WithInterceptor`; `prominitr` itself does not depend on `grpcinitr`.
+`WithPromMonitoring(reg)` remains available for applications that need to
+attach instrumentation to another registry.
 
 ## Lifecycle
 
-`Close(ctx)` is a no-op (the shell holds no external resources) but is
-provided so it implements `apin.Closer` and slots into `apin.App.Track` for
-uniformity.
+`Close(ctx)` is a no-op because the shell holds no external resources. Its
+context-aware close method lets applications use their own lifecycle policy.

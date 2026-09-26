@@ -146,7 +146,7 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health check + reflection toggles; ctx-aware `Serve` |
-| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry}` | |
+| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `apin.LoggerShell` | any logger initr returns the same shell |
 
 ## Graceful Shutdown

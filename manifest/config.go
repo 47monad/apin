@@ -4,10 +4,6 @@ type LoggingConfig struct {
 	Level string `json:"level" env:"log_level"`
 }
 
-type PrometheusConfig struct {
-	GRPCMetrics bool `json:"grpcMetrics"`
-}
-
 type GRPCFeatures struct {
 	Reflection  bool `json:"reflection"`
 	HealthCheck bool `json:"healthCheck"`
@@ -44,7 +40,6 @@ type Config struct {
 	Mode       string            `json:"mode" env:"mode"`
 	Host       string            `json:"host" env:"host"`
 	Logging    LoggingConfig     `json:"logging"`
-	Prometheus *PrometheusConfig `json:"prometheus,omitempty"`
 	GRPC       *GRPCConfig       `json:"grpc,omitempty"`
 	HTTP       *HTTPConfig       `json:"http,omitempty"`
 }

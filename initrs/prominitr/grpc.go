@@ -1,13 +1,16 @@
-package grpcutil
+package prominitr
 
 import (
 	"context"
+
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
 
+// WithPromMonitoring registers gRPC server metrics in reg and returns the
+// interceptor and metrics handle for application-owned server wiring.
 func WithPromMonitoring(reg *prometheus.Registry) (grpc.UnaryServerInterceptor, *grpcprom.ServerMetrics) {
 	srvMetrics := grpcprom.NewServerMetrics(
 		grpcprom.WithServerHandlingTimeHistogram(

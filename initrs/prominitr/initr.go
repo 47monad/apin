@@ -3,11 +3,15 @@ package prominitr
 import (
 	"context"
 
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc"
 )
 
 type Shell struct {
-	Registry *prometheus.Registry
+	Registry              *prometheus.Registry
+	GRPCServerInterceptor grpc.UnaryServerInterceptor
+	GRPCServerMetrics     *grpcprom.ServerMetrics
 }
 
 func MustNew(ctx context.Context, opts ...Option) *Shell {
@@ -24,9 +28,11 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 		return nil, err
 	}
 
-	return &Shell{
-		Registry: prometheus.NewRegistry(),
-	}, nil
+	shell := &Shell{Registry: prometheus.NewRegistry()}
+	if store.GRPCMetrics {
+		shell.GRPCServerInterceptor, shell.GRPCServerMetrics = WithPromMonitoring(shell.Registry)
+	}
+	return shell, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {
