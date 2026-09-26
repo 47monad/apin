@@ -20,14 +20,7 @@
 		}
 	},
 	"grpc": {
-		"servers": {
-			"api": {
-				"port": 50051,
-				"features": {
-					"reflection": true,
-					"healthCheck": true
-				}
-			}
-		}
+		"reflection": true,
+		"healthCheck": true
 	}
 }

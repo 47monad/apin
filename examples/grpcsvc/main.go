@@ -19,20 +19,13 @@ import (
 )
 
 type serviceConfig struct {
-	Name     string          `json:"name" yaml:"name"`
-	Logging  zapinitr.Config `json:"logging" yaml:"logging"`
-	Postgres *pginitr.Config `json:"postgres" yaml:"postgres"`
-	GRPC     *grpcConfig     `json:"grpc" yaml:"grpc"`
+	Name     string           `json:"name" yaml:"name"`
+	Logging  zapinitr.Config  `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config  `json:"postgres" yaml:"postgres"`
+	GRPC     grpcinitr.Config `json:"grpc" yaml:"grpc"`
 }
 
-type grpcConfig struct {
-	Servers map[string]grpcServerConfig `json:"servers" yaml:"servers"`
-}
-
-type grpcServerConfig struct {
-	Port     int              `json:"port" yaml:"port"`
-	Features grpcinitr.Config `json:"features" yaml:"features"`
-}
+const grpcPort = 50051
 
 func main() {
 	ctx := context.Background()
@@ -68,16 +61,15 @@ func main() {
 	}
 	loggerShell.Logger.Info("postgres ready", "querier", fmt.Sprintf("%T", querier))
 
-	grpcCfg := cfg.GRPC.Servers["api"]
 	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&grpcCfg.Features),
+		grpcinitr.WithConfig(&cfg.GRPC),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	app.Track(srvShell)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		log.Fatal(err)
 	}
