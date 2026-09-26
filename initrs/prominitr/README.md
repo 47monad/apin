@@ -54,6 +54,9 @@ interceptor to the selected gRPC server initializer with
 `WithPromMonitoring(reg)` remains available for applications that need to
 attach instrumentation to another registry.
 
+Options are sealed: callers can compose the named options but cannot mutate
+prominitr's private construction state.
+
 ## Lifecycle
 
 `Close(ctx)` is a no-op because the shell holds no external resources. Its

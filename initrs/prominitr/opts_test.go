@@ -1,13 +1,14 @@
-package prominitr
+package prominitr_test
 
 import (
 	"testing"
 
+	"github.com/47monad/apin/initrs/prominitr"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
-	defaultShell, err := New(t.Context())
+	defaultShell, err := prominitr.New(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +19,7 @@ func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
 		t.Fatal("New returned a nil registry")
 	}
 
-	configuredShell, err := New(t.Context(), WithConfig(&Config{GRPCMetrics: true}))
+	configuredShell, err := prominitr.New(t.Context(), prominitr.WithConfig(&prominitr.Config{GRPCMetrics: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,9 +27,9 @@ func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
 		t.Fatal("WithConfig did not enable gRPC instrumentation")
 	}
 
-	overriddenShell, err := New(t.Context(),
-		WithConfig(&Config{GRPCMetrics: true}),
-		WithGRPCMetrics(false),
+	overriddenShell, err := prominitr.New(t.Context(),
+		prominitr.WithConfig(&prominitr.Config{GRPCMetrics: true}),
+		prominitr.WithGRPCMetrics(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +38,7 @@ func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
 		t.Fatal("later WithGRPCMetrics(false) did not override Config")
 	}
 
-	enabledShell, err := New(t.Context(), WithGRPCMetrics(true))
+	enabledShell, err := prominitr.New(t.Context(), prominitr.WithGRPCMetrics(true))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +48,7 @@ func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
 }
 
 func TestWithPromMonitoring(t *testing.T) {
-	interceptor, metrics := WithPromMonitoring(prometheus.NewRegistry())
+	interceptor, metrics := prominitr.WithPromMonitoring(prometheus.NewRegistry())
 	if interceptor == nil {
 		t.Fatal("WithPromMonitoring returned a nil interceptor")
 	}

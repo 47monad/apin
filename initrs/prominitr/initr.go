@@ -23,13 +23,13 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{}
-	if err := apply(store, opts); err != nil {
+	config := &resolvedConfig{}
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
 
 	shell := &Shell{Registry: prometheus.NewRegistry()}
-	if store.GRPCMetrics {
+	if config.grpcMetrics {
 		shell.GRPCServerInterceptor, shell.GRPCServerMetrics = WithPromMonitoring(shell.Registry)
 	}
 	return shell, nil
