@@ -26,7 +26,7 @@ type Shell struct {
 	wg       sync.WaitGroup
 	logger   logr.Logger
 
-	store *Store
+	config *resolvedConfig
 }
 
 func (r *Shell) reconnectLoop() {
@@ -44,7 +44,7 @@ func (r *Shell) reconnectLoop() {
 		r.logger.Info("connection lost, attempting to reconnect...")
 	}
 
-	retryInterval := r.store.MinRetryInterval
+	retryInterval := r.config.minRetryInterval
 
 	for {
 		select {
@@ -67,7 +67,7 @@ func (r *Shell) reconnectLoop() {
 			}
 
 			// Reset retry interval on successful connection
-			retryInterval = r.store.MinRetryInterval
+			retryInterval = r.config.minRetryInterval
 
 			r.lock.Lock()
 			r.conn = conn
@@ -89,7 +89,13 @@ func (r *Shell) reconnectLoop() {
 }
 
 func (r *Shell) tryConnect() (*amqp.Connection, *amqp.Channel, error) {
-	conn, err := amqp.Dial(r.store.URI)
+	var conn *amqp.Connection
+	var err error
+	if r.config.dialConfig == nil {
+		conn, err = amqp.Dial(r.config.uri)
+	} else {
+		conn, err = amqp.DialConfig(r.config.uri, *r.config.dialConfig)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial: %w", err)
 	}
@@ -105,8 +111,8 @@ func (r *Shell) tryConnect() (*amqp.Connection, *amqp.Channel, error) {
 
 func (r *Shell) nextRetryInterval(current time.Duration) time.Duration {
 	next := current * 2
-	if next > r.store.MaxRetryInterval {
-		return r.store.MaxRetryInterval
+	if next > r.config.maxRetryInterval {
+		return r.config.maxRetryInterval
 	}
 	return next
 }

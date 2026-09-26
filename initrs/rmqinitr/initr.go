@@ -17,29 +17,38 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{
-		MinRetryInterval: defaultMinRetryInterval,
-		MaxRetryInterval: defaultMaxRetryInterval,
-		Logger:           logr.Discard(),
+	config := &resolvedConfig{
+		minRetryInterval: defaultMinRetryInterval,
+		maxRetryInterval: defaultMaxRetryInterval,
+		logger:           logr.Discard(),
 	}
-	if err := apply(store, opts); err != nil {
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
 
-	if store.URI == "" {
+	if config.minRetryErr != nil {
+		return nil, config.minRetryErr
+	}
+	if config.maxRetryErr != nil {
+		return nil, config.maxRetryErr
+	}
+	if config.uri == "" {
 		return nil, errors.New("rmqinitr: no rabbitmq configuration provided; pass WithConfig or WithURI")
 	}
-	if store.MaxRetryInterval < store.MinRetryInterval {
-		return nil, fmt.Errorf("rmqinitr: max retry interval (%v) is lower than min (%v)", store.MaxRetryInterval, store.MinRetryInterval)
+	if config.minRetryInterval <= 0 {
+		return nil, fmt.Errorf("rmqinitr: min retry interval must be positive")
+	}
+	if config.maxRetryInterval < config.minRetryInterval {
+		return nil, fmt.Errorf("rmqinitr: max retry interval (%v) is lower than min (%v)", config.maxRetryInterval, config.minRetryInterval)
 	}
 
 	shell := &Shell{
 		stopChan: make(chan struct{}),
-		store:    store,
-		logger:   store.Logger,
+		config:   config,
+		logger:   config.logger,
 	}
 
-	if !store.LazyConnect {
+	if !config.lazyConnect {
 		conn, ch, err := shell.tryConnect()
 		if err != nil {
 			return nil, err

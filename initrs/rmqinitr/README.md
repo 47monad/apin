@@ -59,6 +59,7 @@ channel state.
 | `WithMaxRetryInterval(d time.Duration)` | backoff cap; defaults to `30s`; must not be lower than min |
 | `WithLazyConnect()` | defer the first connection to the background loop; `New` then succeeds without reaching the broker |
 | `WithLogger(logr.Logger)` | logger for connection lifecycle events; defaults to discarding |
+| `WithNativeDialConfig(func(*amqp.Config) error)` | configure native AMQP transport and handshake settings |
 
 ## Config mapping
 
@@ -66,6 +67,11 @@ channel state.
 `MaxRetryInterval` (seconds). Omitted retry intervals default to 1 and 30
 seconds. It never mutates the config you pass in. Any
 value can be overridden by a later option.
+
+Options are sealed: callers can compose named options but cannot mutate
+rmqinitr's private construction state. `WithNativeDialConfig` is the deliberate
+driver escape hatch; without it, `New` retains the driver's standard `Dial`
+behavior.
 
 ## Lifecycle
 
