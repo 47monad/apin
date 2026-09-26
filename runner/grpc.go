@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -18,14 +17,13 @@ import (
 // as soon as the runner starts shutting down.
 const healthCheckTimeout = 2 * time.Second
 
-// AddGRPCServer registers a gRPC server on the configured port. Stop drains
-// its in-flight RPCs with GracefulStop.
-func (r *Runner) AddGRPCServer(serverConfig *manifest.GRPCServerConfig, srv *grpc.Server) *Runner {
-	if serverConfig == nil || srv == nil {
-		r.logger.Error(nil, "AddGRPCServer: nil server config or server, skipping")
+// AddGRPCServer registers a gRPC server on port. Stop drains its in-flight
+// RPCs with GracefulStop.
+func (r *Runner) AddGRPCServer(port int, srv *grpc.Server) *Runner {
+	if srv == nil {
+		r.logger.Error(nil, "AddGRPCServer: nil server, skipping")
 		return r
 	}
-	port := serverConfig.Port
 	r.trackGRPCServer(srv)
 
 	r.Add(func() error {

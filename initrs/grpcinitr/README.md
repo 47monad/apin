@@ -11,16 +11,20 @@ go get github.com/47monad/apin/initrs/grpcinitr
 ## Usage
 
 ```go
-// config-file driven
-srvShell, err := grpcinitr.New(ctx, grpcinitr.WithConfig(&grpcCfg))
+// app-owned config; the initializer owns only server features
+srvShell, err := grpcinitr.New(ctx, grpcinitr.WithConfig(&grpcinitr.Config{
+	Reflection: true,
+	HealthCheck: true,
+}))
 
 // config file + service registration + interceptors
 srvShell, err := grpcinitr.New(ctx,
-	grpcinitr.WithConfig(&grpcCfg),
+	grpcinitr.WithConfig(&grpcCfg.Features),
 	grpcinitr.WithRunnable(func(s *grpc.Server) {
 		pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 	}),
 	grpcinitr.WithInterceptor(authInterceptor),
+	grpcinitr.WithServerOptions(grpc.MaxRecvMsgSize(4<<20)),
 )
 ```
 
@@ -50,18 +54,19 @@ type ServerShell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.GRPCServerConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*grpcinitr.Config)` | apply initializer-owned feature settings |
 | `WithReflection(enabled bool)` | register the gRPC reflection service |
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
 | `WithInterceptor(i grpc.UnaryServerInterceptor)` | append a unary interceptor (repeatable) |
+| `WithServerOptions(options ...grpc.ServerOption)` | pass native gRPC server options |
 
-## Config mapping
+## Configuration
 
-`WithConfig` maps `*manifest.GRPCServerConfig.Features`: `Reflection` and
-`HealthCheck`. (The `Port` is used where you decide to listen — see serving
-above — the initr itself does not bind.) Any value can be overridden by a
-later option.
+`grpcinitr.Config` owns `Reflection` and `HealthCheck`; the application owns
+the port and any aggregation of server instances. `WithConfig` applies feature
+values, and later options override them. `WithInterceptor` and
+`WithServerOptions` are deliberate native gRPC escape hatches.
 
 ## Lifecycle
 

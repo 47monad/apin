@@ -8,7 +8,7 @@
 //
 //	r := runner.New(ctx, "api", logger).
 //		AddHTTPServer(cfg.HTTP.Servers["main"], attachRoutes).
-//		AddGRPCServer(cfg.GRPC.Servers["main"], grpcSrv).
+//		AddGRPCServer(grpcPort, grpcSrv).
 //		AddHealthCheck(healthSrv, time.Second, isHealthy)
 //
 //	if err := r.Run(); err != nil {

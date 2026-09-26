@@ -135,26 +135,3 @@ func TestBuildEnvironmentPrecedence(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "from-process", processConfig.Host)
 }
-
-func TestGRPCClientAddressDefault(t *testing.T) {
-	// Shield the fixture from client-address variables the developer's own
-	// environment may export, so the empty CUE default is what we observe.
-	clearEnv(t)
-
-	t.Run("empty_client_uses_default_address/ok", func(t *testing.T) {
-		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
-		require.NoError(t, err)
-		require.NotNil(t, cfg.GRPC)
-		client, ok := cfg.GRPC.Clients["uwcl"]
-		require.True(t, ok)
-		assert.Equal(t, "", client.Address)
-	})
-
-	t.Run("env_overrides_default_address/ok", func(t *testing.T) {
-		t.Setenv("UWCL_GRPC_CLIENT_ADDRESS", "localhost:50051")
-		cfg, err := manifest.Build("./testdata/grpc_client_default/main.cue", "nonexistent.env")
-		require.NoError(t, err)
-		require.NotNil(t, cfg.GRPC)
-		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["uwcl"].Address)
-	})
-}

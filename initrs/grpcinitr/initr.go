@@ -31,11 +31,13 @@ func New(ctx context.Context, opts ...Option) (*ServerShell, error) {
 
 	shell := &ServerShell{}
 
-	shell.Server = grpc.NewServer(
+	serverOptions := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			store.Interceptors...,
 		),
-	)
+	}
+	serverOptions = append(serverOptions, store.ServerOptions...)
+	shell.Server = grpc.NewServer(serverOptions...)
 
 	if store.HealthCheck {
 		shell.HealthServer = health.NewServer()

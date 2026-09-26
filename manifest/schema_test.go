@@ -81,7 +81,6 @@ func TestSchemaDefaults(t *testing.T) {
 	assert.Equal(t, "error", cfg.Logging.Level)
 
 	// Optional sections stay nil when the instance omits them.
-	assert.Nil(t, cfg.GRPC)
 	assert.Nil(t, cfg.HTTP)
 }
 
@@ -103,28 +102,24 @@ func TestSchemaLoggingLevels(t *testing.T) {
 	})
 }
 
-// TestSchemaCommonPortConstraint guards the `common` import used by the
-// interface and db packages: if those imports fail to resolve, the constraint
-// silently stops being enforced instead of erroring out at load time.
-func TestSchemaCommonPortConstraint(t *testing.T) {
+// TestSchemaHTTPPortConstraint guards the `common` import used by the HTTP
+// interface schema: if it fails to resolve, the constraint silently stops
+// being enforced instead of erroring out at load time.
+func TestSchemaHTTPPortConstraint(t *testing.T) {
 	t.Run("valid ports are accepted", func(t *testing.T) {
 		cfg := mustBuildInstance(t, `{
 			name: "ports"
 			http: {servers: {main: {port: 8080}}}
-			grpc: {servers: {main: {port: 50051}}}
 		}`)
 		assert.Equal(t, 8080, cfg.HTTP.Servers["main"].Port)
-		assert.Equal(t, 50051, cfg.GRPC.Servers["main"].Port)
 	})
 
 	t.Run("default ports are applied", func(t *testing.T) {
 		cfg := mustBuildInstance(t, `{
 			name: "ports"
 			http: {servers: {main: {}}}
-			grpc: {servers: {main: {}}}
 		}`)
 		assert.Equal(t, 4747, cfg.HTTP.Servers["main"].Port)
-		assert.Equal(t, 4748, cfg.GRPC.Servers["main"].Port)
 	})
 
 	for _, tc := range []struct {
@@ -133,8 +128,6 @@ func TestSchemaCommonPortConstraint(t *testing.T) {
 	}{
 		{"zero http port", `{name: "ports", http: {servers: {main: {port: 0}}}}`},
 		{"out of range http port", `{name: "ports", http: {servers: {main: {port: 70_000}}}}`},
-		{"zero grpc port", `{name: "ports", grpc: {servers: {main: {port: 0}}}}`},
-		{"out of range grpc port", `{name: "ports", grpc: {servers: {main: {port: 70_000}}}}`},
 	} {
 		t.Run(tc.name+" is rejected", func(t *testing.T) {
 			_, err := buildInstance(t, tc.service)

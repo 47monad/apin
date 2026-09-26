@@ -16,63 +16,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "debug", cfg.Level)
 	})
 
-	t.Run("GRPCFeatures_struct", func(t *testing.T) {
-		features := manifest.GRPCFeatures{
-			Reflection:  true,
-			HealthCheck: true,
-			Logging:     true,
-		}
-		assert.True(t, features.Reflection)
-		assert.True(t, features.HealthCheck)
-		assert.True(t, features.Logging)
-	})
-
-	t.Run("GRPCClientConfig_struct", func(t *testing.T) {
-		cfg := manifest.GRPCClientConfig{
-			Address: "localhost:50051",
-		}
-		assert.Equal(t, "localhost:50051", cfg.Address)
-	})
-
-	t.Run("GRPCServerConfig_struct", func(t *testing.T) {
-		cfg := manifest.GRPCServerConfig{
-			Port: 50051,
-			Features: manifest.GRPCFeatures{
-				Reflection:  true,
-				HealthCheck: true,
-				Logging:     true,
-			},
-		}
-		assert.Equal(t, 50051, cfg.Port)
-		assert.True(t, cfg.Features.Reflection)
-		assert.True(t, cfg.Features.HealthCheck)
-		assert.True(t, cfg.Features.Logging)
-	})
-
-	t.Run("GRPCConfig_struct", func(t *testing.T) {
-		cfg := manifest.GRPCConfig{
-			Clients: map[string]manifest.GRPCClientConfig{
-				"service1": {
-					Address: "localhost:50051",
-				},
-			},
-			Servers: map[string]manifest.GRPCServerConfig{
-				"main": {
-					Port: 50052,
-					Features: manifest.GRPCFeatures{
-						Reflection:  true,
-						HealthCheck: true,
-						Logging:     true,
-					},
-				},
-			},
-		}
-
-		assert.Equal(t, "localhost:50051", cfg.Clients["service1"].Address)
-		assert.Equal(t, 50052, cfg.Servers["main"].Port)
-		assert.True(t, cfg.Servers["main"].Features.Reflection)
-	})
-
 	t.Run("HTTPConfig_struct", func(t *testing.T) {
 		cfg := manifest.HTTPConfig{
 			Servers: map[string]manifest.HTTPServerConfig{
@@ -95,23 +38,6 @@ func TestConfigStructure(t *testing.T) {
 			Logging: manifest.LoggingConfig{
 				Level: "debug",
 			},
-			GRPC: &manifest.GRPCConfig{
-				Clients: map[string]manifest.GRPCClientConfig{
-					"service1": {
-						Address: "localhost:50051",
-					},
-				},
-				Servers: map[string]manifest.GRPCServerConfig{
-					"main": {
-						Port: 50052,
-						Features: manifest.GRPCFeatures{
-							Reflection:  true,
-							HealthCheck: true,
-							Logging:     true,
-						},
-					},
-				},
-			},
 			HTTP: &manifest.HTTPConfig{
 				Servers: map[string]manifest.HTTPServerConfig{
 					"main": {
@@ -128,10 +54,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "debug", cfg.Mode)
 		assert.Equal(t, "localhost", cfg.Host)
 		assert.Equal(t, "debug", cfg.Logging.Level)
-
-		require.NotNil(t, cfg.GRPC)
-		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["service1"].Address)
-		assert.Equal(t, 50052, cfg.GRPC.Servers["main"].Port)
 
 		require.NotNil(t, cfg.HTTP)
 		assert.Equal(t, 8080, cfg.HTTP.Servers["main"].Port)
@@ -152,7 +74,6 @@ func TestConfigStructure(t *testing.T) {
 
 		assert.Equal(t, "minimal-app", cfg.Name)
 		assert.Equal(t, "Minimal Application", cfg.Title)
-		assert.Nil(t, cfg.GRPC)
 		assert.Nil(t, cfg.HTTP)
 	})
 }

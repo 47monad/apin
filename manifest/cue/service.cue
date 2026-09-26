@@ -16,7 +16,6 @@ import (
   env: *"dev" | #Env
   mode: *"normal" | #Mode
   logging: log.config
-  grpc?: interface.grpc
   http?: interface.http
 }
 

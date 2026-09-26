@@ -149,7 +149,7 @@ func TestGRPCServerGracefulStop(t *testing.T) {
 	healthpb.RegisterHealthServer(grpcSrv, healthSrv)
 
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddGRPCServer(&manifest.GRPCServerConfig{Port: port}, grpcSrv)
+	r.AddGRPCServer(port, grpcSrv)
 	runResult := runAsync(t, r, 5*time.Second)
 	waitForListener(t, port)
 
@@ -258,7 +258,7 @@ func TestStopHardStopsGRPCWhenDrainOutlivesContext(t *testing.T) {
 	healthpb.RegisterHealthServer(grpcSrv, healthSrv)
 
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddGRPCServer(&manifest.GRPCServerConfig{Port: port}, grpcSrv)
+	r.AddGRPCServer(port, grpcSrv)
 	runResult := runAsync(t, r, 5*time.Second)
 	waitForListener(t, port)
 

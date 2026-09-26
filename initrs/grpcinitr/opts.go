@@ -1,34 +1,38 @@
 package grpcinitr
 
 import (
-	"github.com/47monad/apin/manifest"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 )
 
+// Config contains gRPC server features owned by grpcinitr.
+type Config struct {
+	Reflection  bool `json:"reflection" yaml:"reflection" env:"grpc_reflection"`
+	HealthCheck bool `json:"healthCheck" yaml:"healthCheck" env:"grpc_health_check"`
+}
+
 // ServerStore is the resolved configuration of a server shell.
 type ServerStore struct {
-	Interceptors []grpc.UnaryServerInterceptor
-	HealthCheck  bool
-	Reflection   bool
-	PromMetrics  *grpcprom.ServerMetrics
-	Runnable     func(*grpc.Server)
+	Interceptors  []grpc.UnaryServerInterceptor
+	ServerOptions []grpc.ServerOption
+	HealthCheck   bool
+	Reflection    bool
+	Runnable      func(*grpc.Server)
 }
 
 // Option mutates the store. Options are applied in the order they are passed
 // to New, so later options win.
 type Option func(*ServerStore) error
 
-// WithConfig applies a manifest config section. It is the entry point for
+// WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *manifest.GRPCServerConfig) Option {
+func WithConfig(config *Config) Option {
 	return func(s *ServerStore) error {
 		if config == nil {
 			return nil
 		}
 		return apply(s, []Option{
-			WithReflection(config.Features.Reflection),
-			WithHealthCheck(config.Features.HealthCheck),
+			WithReflection(config.Reflection),
+			WithHealthCheck(config.HealthCheck),
 		})
 	}
 }
@@ -63,6 +67,15 @@ func WithHealthCheck(enabled bool) Option {
 func WithInterceptor(i grpc.UnaryServerInterceptor) Option {
 	return func(s *ServerStore) error {
 		s.Interceptors = append(s.Interceptors, i)
+		return nil
+	}
+}
+
+// WithServerOptions appends native gRPC server options. It is the escape
+// hatch for server capabilities not wrapped by grpcinitr.
+func WithServerOptions(options ...grpc.ServerOption) Option {
+	return func(s *ServerStore) error {
+		s.ServerOptions = append(s.ServerOptions, options...)
 		return nil
 	}
 }

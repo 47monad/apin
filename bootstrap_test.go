@@ -126,20 +126,17 @@ func TestRegisterLoggerAndSetLogger(t *testing.T) {
 	app.RegisterLogger(nil)
 }
 
-func TestNewDecodesInitrSections(t *testing.T) {
-	// The loaded manifest must decode into the same section types initrs
-	// consume via WithConfig.
+func TestNewDecodesManifestSections(t *testing.T) {
+	// HTTP remains in this legacy manifest while initializer-specific
+	// configuration is owned by applications.
 	app, err := apin.New(apin.WithConfig("manifest/testdata/main.cue"))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 	cfg := app.Config()
-	var (
-		_ *manifest.GRPCConfig = cfg.GRPC
-		_ *manifest.HTTPConfig = cfg.HTTP
-	)
-	if len(cfg.GRPC.Servers) == 0 {
-		t.Error("GRPC.Servers empty, want decoded section")
+	var _ *manifest.HTTPConfig = cfg.HTTP
+	if len(cfg.HTTP.Servers) == 0 {
+		t.Error("HTTP.Servers empty, want decoded section")
 	}
 }
 

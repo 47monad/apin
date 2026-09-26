@@ -102,21 +102,18 @@ func TestLoadEnvVars(t *testing.T) {
 	})
 
 	t.Run("load_numeric_vars/ok", func(t *testing.T) {
-		t.Setenv("MAIN_GRPC_PORT", "50051")
 		t.Setenv("MAIN_HTTP_PORT", "8080")
 
 		cfg := &manifest.Config{
 			Name:    "test-app",
 			Title:   "Test App",
 			Version: "1.0.0",
-			GRPC:    &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
 			HTTP:    &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
 		}
 
 		err := manifest.LoadEnvVars(cfg)
 		require.NoError(t, err)
 
-		assert.Equal(t, 50051, cfg.GRPC.Servers["main"].Port)
 		assert.Equal(t, 8080, cfg.HTTP.Servers["main"].Port)
 	})
 
@@ -134,37 +131,19 @@ func TestLoadEnvVars(t *testing.T) {
 
 	// TODO: Test Boolean vars. currently no boolean env var exist
 
-	t.Run("map_fields/ok", func(t *testing.T) {
-		t.Setenv("SERVICE1_GRPC_CLIENT_ADDRESS", "localhost:50051")
-
-		cfg := &manifest.Config{
-			GRPC: &manifest.GRPCConfig{
-				Clients: map[string]manifest.GRPCClientConfig{
-					"service1": {},
-				},
-			},
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "localhost:50051", cfg.GRPC.Clients["service1"].Address)
-	})
-
 	t.Run("full/ok", func(t *testing.T) {
 		t.Setenv("ENV", "production")
 		t.Setenv("MODE", "release")
 		t.Setenv("HOST", "0.0.0.0")
 		t.Setenv("LOG_LEVEL", "info")
-		t.Setenv("MAIN_GRPC_PORT", "5000")
 		t.Setenv("MAIN_HTTP_PORT", "8000")
 
 		cfg := &manifest.Config{
-			Name:     "prod-app",
-			Title:    "Production App",
-			Version:  "1.0.0",
-			Logging:  manifest.LoggingConfig{},
-			GRPC:     &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
-			HTTP:     &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
+			Name:    "prod-app",
+			Title:   "Production App",
+			Version: "1.0.0",
+			Logging: manifest.LoggingConfig{},
+			HTTP:    &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
 		}
 
 		err := manifest.LoadEnvVars(cfg)
@@ -174,7 +153,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "release", cfg.Mode)
 		assert.Equal(t, "0.0.0.0", cfg.Host)
 		assert.Equal(t, "info", cfg.Logging.Level)
-		assert.Equal(t, 5000, cfg.GRPC.Servers["main"].Port)
 		assert.Equal(t, 8000, cfg.HTTP.Servers["main"].Port)
 	})
 

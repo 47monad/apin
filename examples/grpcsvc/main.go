@@ -23,7 +23,16 @@ type serviceConfig struct {
 	Name     string                 `json:"name" yaml:"name"`
 	Logging  manifest.LoggingConfig `json:"logging" yaml:"logging"`
 	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
-	GRPC     *manifest.GRPCConfig   `json:"grpc" yaml:"grpc"`
+	GRPC     *grpcConfig            `json:"grpc" yaml:"grpc"`
+}
+
+type grpcConfig struct {
+	Servers map[string]grpcServerConfig `json:"servers" yaml:"servers"`
+}
+
+type grpcServerConfig struct {
+	Port     int              `json:"port" yaml:"port"`
+	Features grpcinitr.Config `json:"features" yaml:"features"`
 }
 
 func main() {
@@ -62,7 +71,7 @@ func main() {
 
 	grpcCfg := cfg.GRPC.Servers["api"]
 	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&grpcCfg),
+		grpcinitr.WithConfig(&grpcCfg.Features),
 	)
 	if err != nil {
 		log.Fatal(err)
