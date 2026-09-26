@@ -12,11 +12,11 @@ import (
 )
 
 // clearEnv empties the process environment for the duration of the test and
-// restores it afterwards. Build loads .env files into the process
-// environment, which leaks into every later Build in the same process (issue
-// #31), so a test asserting the schema defaults has to start from a clean
-// slate. Tests in a package run sequentially, so nothing else observes the
-// empty environment.
+// restores it afterwards. Build no longer loads env files into the process
+// environment (issue #41), but sibling tests set variables directly, so a test
+// asserting the schema defaults still has to start from a clean slate. Tests
+// in a package run sequentially, so nothing else observes the empty
+// environment.
 func clearEnv(t *testing.T) {
 	t.Helper()
 	saved := os.Environ()

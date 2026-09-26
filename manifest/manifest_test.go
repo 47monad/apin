@@ -80,9 +80,10 @@ func TestMustNew(t *testing.T) {
 }
 
 func TestPostgresCUESchema(t *testing.T) {
-	// Build loads env files into the process environment, which leaks
-	// across tests (issue #31). Clear postgres vars so fixtures get a
-	// clean slate; they are unset for the process, not restored.
+	// Build no longer loads env files into the process environment (issue
+	// #41), but sibling tests still set postgres vars directly, so clear
+	// them for a clean slate. They are unset for the process, not restored;
+	// see issue #44 for the cleanup that should replace this.
 	pgEnvVars := []string{
 		"POSTGRES_URI", "POSTGRES_HOST", "POSTGRES_PORT",
 		"POSTGRES_USERNAME", "POSTGRES_PASSWORD", "POSTGRES_DB_NAME",

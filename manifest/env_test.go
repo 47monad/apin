@@ -10,6 +10,9 @@ import (
 )
 
 func TestLoadEnvFile(t *testing.T) {
+	// LoadEnvFile is deprecated: it is the only remaining entry point that
+	// mutates the process environment. This test pins that behavior so the
+	// deprecation stays honest — see issue #41 for the reasoning.
 	t.Run("nonexistent_env/error", func(t *testing.T) {
 		err := manifest.LoadEnvFile("nonexistent.env")
 		assert.Error(t, err)
