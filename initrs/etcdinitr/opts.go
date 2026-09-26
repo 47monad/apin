@@ -1,6 +1,7 @@
 package etcdinitr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,29 +18,29 @@ type Config struct {
 	Timeout   *int   `json:"timeout,omitempty" yaml:"timeout,omitempty" env:"etcd_timeout"`
 }
 
-// Store is the resolved configuration of a shell.
-type Store struct {
-	Opts *clientv3.Config
+// resolvedConfig is private construction state owned by etcdinitr.
+type resolvedConfig struct {
+	opts       *clientv3.Config
+	timeoutErr error
 }
 
-// Option mutates the store. Options are applied in the order they are passed
-// to New, so later options win.
-type Option func(*Store) error
+// Option is a sealed functional option accepted by New.
+type Option interface {
+	apply(*resolvedConfig) error
+}
+
+type optionFunc func(*resolvedConfig) error
+
+func (option optionFunc) apply(config *resolvedConfig) error {
+	return option(config)
+}
 
 // WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
 func WithConfig(config *Config) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if config == nil {
 			return nil
-		}
-		if config.Timeout != nil {
-			if *config.Timeout <= 0 {
-				return fmt.Errorf("etcd timeout must be positive")
-			}
-			if uint64(*config.Timeout) > uint64(1<<63-1)/uint64(time.Second) {
-				return fmt.Errorf("etcd timeout overflows time.Duration")
-			}
 		}
 		opts := []Option{WithEndpoints(strings.Split(config.Endpoints, ","))}
 		if config.Username != "" {
@@ -49,52 +50,78 @@ func WithConfig(config *Config) Option {
 			opts = append(opts, WithPassword(config.Password))
 		}
 		if config.Timeout != nil {
-			opts = append(opts, WithTimeout(time.Duration(*config.Timeout)*time.Second))
+			seconds := *config.Timeout
+			if seconds <= 0 {
+				s.timeoutErr = fmt.Errorf("etcd timeout must be positive")
+			} else if uint64(seconds) > uint64(1<<63-1)/uint64(time.Second) {
+				s.timeoutErr = fmt.Errorf("etcd timeout overflows time.Duration")
+			} else {
+				s.opts.DialTimeout = time.Duration(seconds) * time.Second
+				s.timeoutErr = nil
+			}
 		}
 		return apply(s, opts)
-	}
+	})
 }
 
 // WithEndpoints sets the etcd endpoints.
 func WithEndpoints(endpoints []string) Option {
-	return func(s *Store) error {
-		s.Opts.Endpoints = endpoints
+	return optionFunc(func(s *resolvedConfig) error {
+		s.opts.Endpoints = endpoints
 		return nil
-	}
+	})
 }
 
 // WithUsername sets the auth username.
 func WithUsername(username string) Option {
-	return func(s *Store) error {
-		s.Opts.Username = username
+	return optionFunc(func(s *resolvedConfig) error {
+		s.opts.Username = username
 		return nil
-	}
+	})
 }
 
 // WithPassword sets the auth password.
 func WithPassword(password string) Option {
-	return func(s *Store) error {
-		s.Opts.Password = password
+	return optionFunc(func(s *resolvedConfig) error {
+		s.opts.Password = password
 		return nil
-	}
+	})
 }
 
 // WithTimeout sets the dial timeout.
 func WithTimeout(d time.Duration) Option {
-	return func(s *Store) error {
-		s.Opts.DialTimeout = d
+	return optionFunc(func(s *resolvedConfig) error {
+		s.opts.DialTimeout = d
+		s.timeoutErr = nil
 		return nil
-	}
+	})
 }
 
-func apply(s *Store, opts []Option) error {
+// WithNativeConfig configures native etcd client settings not represented by
+// Config or the named etcdinitr options.
+func WithNativeConfig(configure func(*clientv3.Config) error) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		if configure != nil {
+			if err := configure(s.opts); err != nil {
+				return err
+			}
+			if s.opts.DialTimeout > 0 {
+				s.timeoutErr = nil
+			}
+		}
+		return nil
+	})
+}
+
+func apply(s *resolvedConfig, opts []Option) error {
+	var errs []error
 	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-		if err := opt(s); err != nil {
-			return err
+		if err := opt.apply(s); err != nil {
+			errs = append(errs, fmt.Errorf("etcdinitr: apply option: %w", err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }

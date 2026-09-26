@@ -20,12 +20,12 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store, err := newStore(opts)
+	config, err := resolveConfig(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := clientv3.New(*store.Opts)
+	client, err := clientv3.New(*config.opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to etcd: %w", err)
 	}
@@ -33,15 +33,18 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	return &Shell{Client: client}, nil
 }
 
-func newStore(opts []Option) (*Store, error) {
-	store := &Store{Opts: &clientv3.Config{}}
-	if err := apply(store, opts); err != nil {
+func resolveConfig(opts []Option) (*resolvedConfig, error) {
+	config := &resolvedConfig{opts: &clientv3.Config{}}
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
-	if store.Opts.DialTimeout < 0 {
+	if config.timeoutErr != nil {
+		return nil, config.timeoutErr
+	}
+	if config.opts.DialTimeout < 0 {
 		return nil, fmt.Errorf("etcd dial timeout must not be negative")
 	}
-	return store, nil
+	return config, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {

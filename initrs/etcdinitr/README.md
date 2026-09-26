@@ -57,6 +57,7 @@ type Shell struct {
 | `WithUsername(username string)` | auth username |
 | `WithPassword(password string)` | auth password |
 | `WithTimeout(d time.Duration)` | dial timeout |
+| `WithNativeConfig(func(*clientv3.Config) error)` | configure native etcd client settings not represented by the named options |
 
 ## Config mapping
 
@@ -65,6 +66,10 @@ remains comma-separated and `Timeout` is an optional positive number of
 seconds. An omitted timeout leaves the native client's timeout unset, while an
 explicit zero or negative timeout is rejected. Later options override
 individual configured values.
+
+Options are sealed: callers can compose the named options but cannot mutate
+etcdinitr's private construction state. Native client configuration is the
+deliberate driver escape hatch.
 
 ## Lifecycle
 
