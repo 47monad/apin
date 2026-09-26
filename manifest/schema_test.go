@@ -76,30 +76,8 @@ func TestSchemaDefaults(t *testing.T) {
 	assert.Equal(t, "dev", cfg.Env)
 	assert.Equal(t, "normal", cfg.Mode)
 
-	// The logging section is omitted entirely, so the log package's default
-	// level must still materialize on decode.
-	assert.Equal(t, "error", cfg.Logging.Level)
-
 	// Optional sections stay nil when the instance omits them.
 	assert.Nil(t, cfg.HTTP)
-}
-
-func TestSchemaLoggingLevels(t *testing.T) {
-	t.Run("explicit level wins", func(t *testing.T) {
-		cfg := mustBuildInstance(t, `{name: "lvl", logging: {level: "debug"}}`)
-		assert.Equal(t, "debug", cfg.Logging.Level)
-	})
-
-	t.Run("empty section falls back to the default", func(t *testing.T) {
-		cfg := mustBuildInstance(t, `{name: "lvl", logging: {}}`)
-		assert.Equal(t, "error", cfg.Logging.Level)
-	})
-
-	t.Run("level outside #Level is rejected", func(t *testing.T) {
-		_, err := buildInstance(t, `{name: "lvl", logging: {level: "verbose"}}`)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "logging.level")
-	})
 }
 
 // TestSchemaHTTPPortConstraint guards the `common` import used by the HTTP

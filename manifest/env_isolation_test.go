@@ -45,25 +45,24 @@ func TestParseEnvFile(t *testing.T) {
 	t.Run("values are parsed without touching the process env", func(t *testing.T) {
 		clearEnv(t)
 		path := filepath.Join(t.TempDir(), ".env")
-		require.NoError(t, os.WriteFile(path, []byte("LOG_LEVEL=warn\nHOST=from-file\n"), 0o600))
+		require.NoError(t, os.WriteFile(path, []byte("HOST=from-file\n"), 0o600))
 
 		vars, err := manifest.ParseEnvFile(path)
 		require.NoError(t, err)
 
-		value, ok := vars.Lookup("LOG_LEVEL")
+		value, ok := vars.Lookup("HOST")
 		assert.True(t, ok)
-		assert.Equal(t, "warn", value)
+		assert.Equal(t, "from-file", value)
 		_, ok = vars.Lookup("NOT_IN_FILE")
 		assert.False(t, ok, "Lookup must not invent variables")
 
-		assert.Empty(t, os.Getenv("LOG_LEVEL"), "parsing must not mutate the process env")
 		assert.Empty(t, os.Getenv("HOST"), "parsing must not mutate the process env")
 	})
 }
 
 func TestLookupPrecedence(t *testing.T) {
 	clearEnv(t)
-	vars := manifest.EnvVars{"LOG_LEVEL": "from-file", "ONLY_FILE": "file", "EMPTY": ""}
+	vars := manifest.EnvVars{"HOST": "from-file", "ONLY_FILE": "file", "EMPTY": ""}
 
 	t.Run("file value is used when the process env has none", func(t *testing.T) {
 		value, ok := vars.Lookup("ONLY_FILE")
@@ -72,8 +71,8 @@ func TestLookupPrecedence(t *testing.T) {
 	})
 
 	t.Run("process env wins over the file", func(t *testing.T) {
-		t.Setenv("LOG_LEVEL", "from-process")
-		value, ok := vars.Lookup("LOG_LEVEL")
+		t.Setenv("HOST", "from-process")
+		value, ok := vars.Lookup("HOST")
 		assert.True(t, ok)
 		assert.Equal(t, "from-process", value)
 	})
@@ -96,12 +95,11 @@ func TestBuildDoesNotMutateProcessEnv(t *testing.T) {
 
 	cfg, err := buildWith(t,
 		`{name: "isolation"}`,
-		"LOG_LEVEL=warn\nHOST=from-file\n",
+		"HOST=from-file\n",
 	)
 	require.NoError(t, err)
 
 	// The file is applied to the config...
-	assert.Equal(t, "warn", cfg.Logging.Level)
 	assert.Equal(t, "from-file", cfg.Host)
 
 	// ...and to nothing else.
@@ -111,24 +109,24 @@ func TestBuildDoesNotMutateProcessEnv(t *testing.T) {
 func TestBuildEnvPrecedence(t *testing.T) {
 	t.Run("process env overrides the env file", func(t *testing.T) {
 		clearEnv(t)
-		t.Setenv("LOG_LEVEL", "from-process")
-		cfg, err := buildWith(t, `{name: "prec"}`, "LOG_LEVEL=from-file\n")
+		t.Setenv("HOST", "from-process")
+		cfg, err := buildWith(t, `{name: "prec"}`, "HOST=from-file\n")
 		require.NoError(t, err)
-		assert.Equal(t, "from-process", cfg.Logging.Level)
+		assert.Equal(t, "from-process", cfg.Host)
 	})
 
 	t.Run("env file overrides the manifest", func(t *testing.T) {
 		clearEnv(t)
-		cfg, err := buildWith(t, `{name: "prec", logging: {level: "info"}}`, "LOG_LEVEL=fatal\n")
+		cfg, err := buildWith(t, `{name: "prec", host: "from-cue"}`, "HOST=from-file\n")
 		require.NoError(t, err)
-		assert.Equal(t, "fatal", cfg.Logging.Level)
+		assert.Equal(t, "from-file", cfg.Host)
 	})
 
 	t.Run("manifest is used when neither sets a value", func(t *testing.T) {
 		clearEnv(t)
-		cfg, err := buildWith(t, `{name: "prec", logging: {level: "info"}}`, "")
+		cfg, err := buildWith(t, `{name: "prec", host: "from-cue"}`, "")
 		require.NoError(t, err)
-		assert.Equal(t, "info", cfg.Logging.Level)
+		assert.Equal(t, "from-cue", cfg.Host)
 	})
 
 }
@@ -153,7 +151,7 @@ func TestBuildConcurrent(t *testing.T) {
 	envPaths := make([]string, len(levels))
 	for i, level := range levels {
 		envPath := filepath.Join(dir, fmt.Sprintf("level-%d.env", i))
-		require.NoError(t, os.WriteFile(envPath, []byte("LOG_LEVEL="+level+"\n"), 0o600))
+		require.NoError(t, os.WriteFile(envPath, []byte("HOST="+level+"\n"), 0o600))
 		envPaths[i] = envPath
 	}
 
@@ -173,9 +171,9 @@ func TestBuildConcurrent(t *testing.T) {
 					errs <- fmt.Errorf("goroutine %d: %w", g, err)
 					return
 				}
-				if cfg.Logging.Level != levels[i] {
-					errs <- fmt.Errorf("goroutine %d: Logging.Level = %q, want %q from its own env file",
-						g, cfg.Logging.Level, levels[i])
+				if cfg.Host != levels[i] {
+					errs <- fmt.Errorf("goroutine %d: Host = %q, want %q from its own env file",
+						g, cfg.Host, levels[i])
 					return
 				}
 			}
@@ -192,14 +190,14 @@ func TestBuildConcurrent(t *testing.T) {
 
 	// The whole run must not have leaked a single variable.
 	for _, level := range levels {
-		if v := os.Getenv("LOG_LEVEL"); v != "" {
-			t.Errorf("LOG_LEVEL = %q, want the process environment untouched (wanted level %s)", v, level)
+		if v := os.Getenv("HOST"); v != "" {
+			t.Errorf("HOST = %q, want the process environment untouched (wanted value %s)", v, level)
 		}
 	}
 }
 
 func TestOverlayNilConfig(t *testing.T) {
-	err := manifest.EnvVars{"LOG_LEVEL": "warn"}.Overlay(nil)
+	err := manifest.EnvVars{"HOST": "warn"}.Overlay(nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nil")
 }
@@ -214,7 +212,7 @@ func TestBuildErrorWrapping(t *testing.T) {
 
 	envPath := filepath.Join(dir, ".env")
 	// Unterminated quote: godotenv fails to parse it.
-	require.NoError(t, os.WriteFile(envPath, []byte("LOG_LEVEL=\"unterminated\n"), 0o600))
+	require.NoError(t, os.WriteFile(envPath, []byte("HOST=\"unterminated\n"), 0o600))
 
 	_, err := manifest.Build(configPath, envPath)
 	require.Error(t, err)

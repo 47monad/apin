@@ -37,12 +37,11 @@ import (
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
-	"github.com/47monad/apin/manifest"
 )
 
 type serviceConfig struct {
 	Name     string                 `json:"name" yaml:"name"`
-	Logging  manifest.LoggingConfig `json:"logging" yaml:"logging"`
+	Logging  zapinitr.Config        `json:"logging" yaml:"logging"`
 	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
 	GRPC     *grpcConfig            `json:"grpc" yaml:"grpc"`
 }
@@ -70,7 +69,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.RegisterLogger(loggerShell)
+app.RegisterLogger(loggerShell.Logger)
+app.Track(loggerShell)
 
 	dbShell, err := pginitr.New(ctx,
 		pginitr.WithConfig(cfg.Postgres), // config file values...
@@ -121,7 +121,7 @@ Every initr follows the same contract, so any service reads the same way:
 
 1. **Shells.** Each initr returns a `Shell` — the ready-to-use handle for its
    service (e.g. `pginitr.Shell`, `rmqinitr.Shell`). Cross-cutting shells
-   (logging) return `apin.LoggerShell`, so consumers are logger-agnostic.
+   (logging) return an initializer-owned shell exposing `logr.Logger`.
 2. **Construction.** `New(ctx, opts ...Option)` and `MustNew(ctx, opts...)`.
    `New` connects eagerly and fails fast on missing configuration or dial
    errors.
@@ -156,7 +156,7 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health check + reflection toggles; ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
-| [`initrs/zapinitr`](initrs/zapinitr) | `apin.LoggerShell` | any logger initr returns the same shell |
+| [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
 
 ## Graceful Shutdown
 
@@ -167,7 +167,8 @@ app, err := apin.New(apin.WithConfig("config.json"))
 if err != nil {
 	log.Fatal(err)
 }
-app.RegisterLogger(loggerShell)
+app.RegisterLogger(loggerShell.Logger)
+app.Track(loggerShell)
 defer app.Close(context.Background()) // manual lifecycle control
 ```
 
@@ -220,8 +221,8 @@ An initializer can also be configured entirely through options.
 
 ## Repository Layout
 
-- `common.go`, `app.go`, `bootstrap.go`, `config.go` — apin core (`LoggerShell`,
-  `Closer`, `App`, `apin.New` and config loading)
+- `common.go`, `app.go`, `bootstrap.go`, `config.go` — apin core (`Closer`,
+  `App`, `apin.New` and config loading)
 - `config/` — standalone JSON/YAML loading and environment overlays
 - `manifest/` — legacy CUE schema and configuration facilities
 - `closr/` — the `Closer` alias, kept for compatibility

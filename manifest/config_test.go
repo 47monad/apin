@@ -9,13 +9,6 @@ import (
 )
 
 func TestConfigStructure(t *testing.T) {
-	t.Run("LoggingConfig_struct", func(t *testing.T) {
-		cfg := manifest.LoggingConfig{
-			Level: "debug",
-		}
-		assert.Equal(t, "debug", cfg.Level)
-	})
-
 	t.Run("HTTPConfig_struct", func(t *testing.T) {
 		cfg := manifest.HTTPConfig{
 			Servers: map[string]manifest.HTTPServerConfig{
@@ -35,9 +28,6 @@ func TestConfigStructure(t *testing.T) {
 			Env:     "development",
 			Mode:    "debug",
 			Host:    "localhost",
-			Logging: manifest.LoggingConfig{
-				Level: "debug",
-			},
 			HTTP: &manifest.HTTPConfig{
 				Servers: map[string]manifest.HTTPServerConfig{
 					"main": {
@@ -53,7 +43,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "development", cfg.Env)
 		assert.Equal(t, "debug", cfg.Mode)
 		assert.Equal(t, "localhost", cfg.Host)
-		assert.Equal(t, "debug", cfg.Logging.Level)
 
 		require.NotNil(t, cfg.HTTP)
 		assert.Equal(t, 8080, cfg.HTTP.Servers["main"].Port)
@@ -67,9 +56,6 @@ func TestConfigStructure(t *testing.T) {
 			Env:     "production",
 			Mode:    "release",
 			Host:    "0.0.0.0",
-			Logging: manifest.LoggingConfig{
-				Level: "info",
-			},
 		}
 
 		assert.Equal(t, "minimal-app", cfg.Name)

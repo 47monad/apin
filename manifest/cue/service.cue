@@ -1,7 +1,6 @@
 package cue
 
 import (
-  "github.com/47monad/apin/manifest/cue/log"
   "github.com/47monad/apin/manifest/cue/interface"
 )
 
@@ -15,7 +14,6 @@ import (
   host: *"127.0.0.1" | string
   env: *"dev" | #Env
   mode: *"normal" | #Mode
-  logging: log.config
   http?: interface.http
 }
 

@@ -83,13 +83,12 @@ func (app *App) SetLogger(logger logr.Logger) {
 	app.logger = logger
 }
 
-// RegisterLogger installs the logger of a logger initr shell (e.g. a
-// zapinitr Shell) as the app logger. Logger initrs need the config that New
-// loads, so they can only be built after construction — this is the
-// post-construction counterpart of the WithLogger NewApp option.
-func (app *App) RegisterLogger(shell *LoggerShell) {
-	if shell == nil {
+// RegisterLogger installs a logger for lifecycle events. Logger initrs need
+// application configuration, so their logger is registered after creation.
+// Track a logger shell separately when it owns resources that must be closed.
+func (app *App) RegisterLogger(logger logr.Logger) {
+	if logger.GetSink() == nil {
 		return
 	}
-	app.logger = shell.Logger
+	app.logger = logger
 }

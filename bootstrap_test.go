@@ -36,8 +36,8 @@ func TestNewLoadsManifest(t *testing.T) {
 		t.Errorf("Name = %q, want %q", cfg.Name, "test")
 	}
 	// Env overlay must apply on top of the CUE values.
-	if got, want := cfg.Logging.Level, "info"; got != want {
-		t.Errorf("Logging.Level = %q, want %q from env", got, want)
+	if got, want := cfg.Host, "from-env"; got != want {
+		t.Errorf("Host = %q, want %q from env", got, want)
 	}
 	if got, want := cfg.HTTP.Servers["main"].Port, 8787; got != want {
 		t.Errorf("HTTP port = %d, want %d", got, want)
@@ -54,8 +54,8 @@ func TestNewWithEnvAfterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if got, want := app.Config().Logging.Level, "info"; got != want {
-		t.Errorf("Logging.Level = %q, want %q from env", got, want)
+	if got, want := app.Config().Host, "from-env"; got != want {
+		t.Errorf("Host = %q, want %q from env", got, want)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestRegisterLoggerAndSetLogger(t *testing.T) {
 	}
 
 	sink := &recordingSink{}
-	app.RegisterLogger(&apin.LoggerShell{Logger: logr.New(sink)})
+	app.RegisterLogger(logr.New(sink))
 	app.Logger().Info("hello")
 	if sink.writes != 1 {
 		t.Errorf("registered logger not in use, writes = %d", sink.writes)
@@ -123,7 +123,7 @@ func TestRegisterLoggerAndSetLogger(t *testing.T) {
 
 	// SetLogger swaps the logger again; RegisterLogger(nil) is a no-op.
 	app.SetLogger(logr.Discard())
-	app.RegisterLogger(nil)
+	app.RegisterLogger(logr.Logger{})
 }
 
 func TestNewDecodesManifestSections(t *testing.T) {

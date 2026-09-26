@@ -1,8 +1,8 @@
 # zapinitr
 
-[Zap](https://pkg.go.dev/go.uber.org/zap) logger initr. Returns an
-`apin.LoggerShell` — the cross-cutting shell every logger initr returns, so
-consumers are logger-agnostic.
+[Zap](https://pkg.go.dev/go.uber.org/zap) logger initializer. Its
+initializer-owned configuration and shell keep this module independent of
+the apin root module.
 
 ```bash
 go get github.com/47monad/apin/initrs/zapinitr
@@ -10,52 +10,37 @@ go get github.com/47monad/apin/initrs/zapinitr
 
 ## Usage
 
-```go
-loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
+Applications define aggregate configuration from only the initrs they select:
 
-// config file + overrides
+```go
+type serviceConfig struct {
+	Logging zapinitr.Config `json:"logging" yaml:"logging"`
+}
+
+loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
+if err != nil {
+	return err
+}
+app.RegisterLogger(loggerShell.Logger)
+app.Track(loggerShell)
+```
+
+Individual options are also available; later options override configuration:
+
+```go
 loggerShell, err := zapinitr.New(ctx,
 	zapinitr.WithConfig(&cfg.Logging),
 	zapinitr.WithLevel("debug"),
 )
-
-// no config file
-loggerShell, err := zapinitr.New(ctx)
 ```
 
-## Shell
+## Config and options
 
-```go
-// apin (core) — uniform for any logger initr
-type LoggerShell struct {
-	Logger logr.Logger
-}
-```
+`Config` currently contains `Level` (`"debug"`, `"info"`, `"warn"`,
+`"error"`, or `"fatal"`). `WithConfig(*Config)` applies it, while
+`WithLevel` can override it. An empty level uses zap's production default;
+invalid levels fail construction.
 
-The shell wraps zap in a `logr.Logger` (`zapr`), so the rest of the app and
-initrs depend on `logr`, never on zap directly. Callers that need raw zap can
-adapt `zaplogr.Logger` themselves.
-
-## Options
-
-| Option | Description |
-|---|---|
-| `WithConfig(*manifest.LoggingConfig)` | apply a manifest config section (entry point for config-file setups) |
-| `WithLevel(level string)` | log level (`"debug"`, `"info"`, ...); invalid values fail `New`; defaults to zap's production default |
-
-## Config mapping
-
-`WithConfig` maps `*manifest.LoggingConfig.Level`. It can be overridden by a
-later option.
-
-## Production preset
-
-The logger is built from zap's production config with `AddCallerSkip(1)` (so
-callers through the `logr` wrapper report correctly), a fixed time layout,
-and stacktraces hidden.
-
-## Lifecycle
-
-`LoggerShell` holds no external resources and does not implement
-`apin.Closer` — there is nothing to close, so it is not tracked by
-`apin.App`.
+The shell exposes a `logr.Logger` and implements
+`Close(context.Context) error`, which flushes the native zap logger. The
+application decides when the shell is closed by tracking it with `App.Track`.

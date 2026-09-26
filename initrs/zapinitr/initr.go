@@ -2,15 +2,17 @@ package zapinitr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"syscall"
 
-	"github.com/47monad/apin"
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func MustNew(ctx context.Context, opts ...Option) *apin.LoggerShell {
+func MustNew(ctx context.Context, opts ...Option) *Shell {
 	shell, err := New(ctx, opts...)
 	if err != nil {
 		panic(err)
@@ -18,7 +20,7 @@ func MustNew(ctx context.Context, opts ...Option) *apin.LoggerShell {
 	return shell
 }
 
-func New(ctx context.Context, opts ...Option) (*apin.LoggerShell, error) {
+func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	store := &Store{}
 	if err := apply(store, opts); err != nil {
 		return nil, err
@@ -43,7 +45,23 @@ func New(ctx context.Context, opts ...Option) (*apin.LoggerShell, error) {
 		return nil, fmt.Errorf("failed to build zap logger: %w", err)
 	}
 
-	return &apin.LoggerShell{
-		Logger: zapr.NewLoggerWithOptions(zapLog),
-	}, nil
+	return &Shell{Logger: zapr.NewLoggerWithOptions(zapLog), zap: zapLog}, nil
+}
+
+// Shell exposes the logr logger and retains zap for lifecycle flushing.
+type Shell struct {
+	Logger logr.Logger
+	zap    *zap.Logger
+}
+
+// Close flushes buffered zap output. The context is accepted to satisfy the
+// common shell lifecycle contract; zap's Sync operation is synchronous.
+func (shell *Shell) Close(_ context.Context) error {
+	if shell == nil || shell.zap == nil {
+		return nil
+	}
+	if err := shell.zap.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) {
+		return err
+	}
+	return nil
 }

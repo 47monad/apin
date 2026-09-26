@@ -1,8 +1,9 @@
 package zapinitr
 
-import (
-	"github.com/47monad/apin/manifest"
-)
+// Config contains zap initializer settings.
+type Config struct {
+	Level string `json:"level" yaml:"level" env:"log_level"`
+}
 
 // Store is the resolved configuration of a logger shell.
 type Store struct {
@@ -13,9 +14,8 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a manifest config section. It is the entry point for
-// config-file driven setups.
-func WithConfig(config *manifest.LoggingConfig) Option {
+// WithConfig applies initializer-owned configuration.
+func WithConfig(config *Config) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

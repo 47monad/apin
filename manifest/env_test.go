@@ -83,13 +83,11 @@ func TestLoadEnvVars(t *testing.T) {
 		t.Setenv("ENV", "test")
 		t.Setenv("MODE", "debug")
 		t.Setenv("HOST", "localhost")
-		t.Setenv("LOG_LEVEL", "info")
 
 		cfg := &manifest.Config{
 			Name:    "test-app",
 			Title:   "Test App",
 			Version: "1.0.0",
-			Logging: manifest.LoggingConfig{},
 		}
 
 		err := manifest.LoadEnvVars(cfg)
@@ -98,7 +96,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "test", cfg.Env)
 		assert.Equal(t, "debug", cfg.Mode)
 		assert.Equal(t, "localhost", cfg.Host)
-		assert.Equal(t, "info", cfg.Logging.Level)
 	})
 
 	t.Run("load_numeric_vars/ok", func(t *testing.T) {
@@ -135,14 +132,12 @@ func TestLoadEnvVars(t *testing.T) {
 		t.Setenv("ENV", "production")
 		t.Setenv("MODE", "release")
 		t.Setenv("HOST", "0.0.0.0")
-		t.Setenv("LOG_LEVEL", "info")
 		t.Setenv("MAIN_HTTP_PORT", "8000")
 
 		cfg := &manifest.Config{
 			Name:    "prod-app",
 			Title:   "Production App",
 			Version: "1.0.0",
-			Logging: manifest.LoggingConfig{},
 			HTTP:    &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
 		}
 
@@ -152,7 +147,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "production", cfg.Env)
 		assert.Equal(t, "release", cfg.Mode)
 		assert.Equal(t, "0.0.0.0", cfg.Host)
-		assert.Equal(t, "info", cfg.Logging.Level)
 		assert.Equal(t, 8000, cfg.HTTP.Servers["main"].Port)
 	})
 

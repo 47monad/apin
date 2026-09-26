@@ -16,14 +16,13 @@ import (
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
-	"github.com/47monad/apin/manifest"
 )
 
 type serviceConfig struct {
-	Name     string                 `json:"name" yaml:"name"`
-	Logging  manifest.LoggingConfig `json:"logging" yaml:"logging"`
-	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
-	GRPC     *grpcConfig            `json:"grpc" yaml:"grpc"`
+	Name     string          `json:"name" yaml:"name"`
+	Logging  zapinitr.Config `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config `json:"postgres" yaml:"postgres"`
+	GRPC     *grpcConfig     `json:"grpc" yaml:"grpc"`
 }
 
 type grpcConfig struct {
@@ -44,13 +43,13 @@ func main() {
 	}
 	app := apin.NewApp()
 
-	// Logger initr: cross-cutting, returns apin.LoggerShell. RegisterLogger
-	// installs it for lifecycle events.
+	// Logger initr returns its own shell; App owns its lifecycle and shutdown.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.RegisterLogger(loggerShell)
+	app.RegisterLogger(loggerShell.Logger)
+	app.Track(loggerShell)
 
 	// Postgres: config-file values, with a per-field programmatic override.
 	dbShell, err := pginitr.New(ctx,
