@@ -15,9 +15,8 @@ import (
 // restores it afterwards.
 //
 // t.Setenv cannot be used here: it can only set a value, and the overlay
-// distinguishes "unset" from "set to empty" — an empty POSTGRES_* variable
-// still counts as present when the optional postgres section is allocated, so
-// a test asserting that the section stays nil would see it allocated. Tests
+// distinguishes "unset" from "set to empty", so a default assertion would
+// be affected by ambient variables. Tests
 // that need a variable *set* use t.Setenv, which restores itself; this helper
 // is for the ones that need a variable *absent*.
 //
@@ -83,7 +82,6 @@ func TestSchemaDefaults(t *testing.T) {
 
 	// Optional sections stay nil when the instance omits them.
 	assert.Nil(t, cfg.Mongodb)
-	assert.Nil(t, cfg.Postgres)
 	assert.Nil(t, cfg.Etcd)
 	assert.Nil(t, cfg.RabbitMQ)
 	assert.Nil(t, cfg.Prometheus)

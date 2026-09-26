@@ -4,28 +4,6 @@ type LoggingConfig struct {
 	Level string `json:"level" env:"log_level"`
 }
 
-type PostgresConfig struct {
-	URI         string             `json:"uri" env:"postgres_uri"`
-	Host        string             `json:"host" env:"postgres_host"`
-	Port        int                `json:"port" env:"postgres_port"`
-	Username    string             `json:"username" env:"postgres_username"`
-	Password    string             `json:"password" env:"postgres_password"`
-	DBName      string             `json:"dbName" env:"postgres_db_name"`
-	SSLMode     string             `json:"sslMode,omitempty" env:"postgres_ssl_mode"`
-	AppName     string             `json:"appName,omitempty" env:"postgres_app_name"`
-	ConnTimeout int                `json:"connTimeout,omitempty" env:"postgres_conn_timeout"`
-	Mode        string             `json:"mode" env:"postgres_mode"`
-	Pool        PostgresPoolConfig `json:"pool,omitempty"`
-}
-
-type PostgresPoolConfig struct {
-	MaxConns            int `json:"maxConns,omitempty" env:"postgres_pool_max_conns"`
-	MinConns            int `json:"minConns,omitempty" env:"postgres_pool_min_conns"`
-	MaxConnLifetime     int `json:"maxConnLifetime,omitempty" env:"postgres_pool_max_conn_lifetime"`
-	MaxConnIdleTime     int `json:"maxConnIdleTime,omitempty" env:"postgres_pool_max_conn_idle_time"`
-	HealthCheckInterval int `json:"healthCheckInterval,omitempty" env:"postgres_pool_health_check_interval"`
-}
-
 type MongodbOptions struct {
 	ReplicaSet string `json:"replicaSet"`
 }
@@ -93,7 +71,6 @@ type Config struct {
 	Host       string            `json:"host" env:"host"`
 	Logging    LoggingConfig     `json:"logging"`
 	Mongodb    *MongodbConfig    `json:"mongodb,omitempty"`
-	Postgres   *PostgresConfig   `json:"postgres,omitempty"`
 	Etcd       *EtcdConfig       `json:"etcd,omitempty"`
 	RabbitMQ   *RabbitMQConfig   `json:"rabbitmq,omitempty"`
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty"`

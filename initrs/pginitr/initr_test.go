@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	"github.com/47monad/apin/initrs/pginitr"
-	"github.com/47monad/apin/manifest"
 )
 
-func config() *manifest.PostgresConfig {
-	return &manifest.PostgresConfig{
+func config() *pginitr.Config {
+	return &pginitr.Config{
 		Host:     "localhost",
 		Port:     5432,
 		Username: "postgres",

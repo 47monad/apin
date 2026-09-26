@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-
-	"github.com/47monad/apin/manifest"
 )
 
 // Mode selects the connection strategy of the shell.
@@ -21,11 +19,11 @@ const (
 // PoolConfig carries pgxpool tuning. Times are in seconds and are only
 // applied when the shell runs in ModePool.
 type PoolConfig struct {
-	MaxConns            int
-	MinConns            int
-	MaxConnLifetime     int
-	MaxConnIdleTime     int
-	HealthCheckInterval int
+	MaxConns            int `json:"maxConns,omitempty" yaml:"maxConns,omitempty" env:"postgres_pool_max_conns"`
+	MinConns            int `json:"minConns,omitempty" yaml:"minConns,omitempty" env:"postgres_pool_min_conns"`
+	MaxConnLifetime     int `json:"maxConnLifetime,omitempty" yaml:"maxConnLifetime,omitempty" env:"postgres_pool_max_conn_lifetime"`
+	MaxConnIdleTime     int `json:"maxConnIdleTime,omitempty" yaml:"maxConnIdleTime,omitempty" env:"postgres_pool_max_conn_idle_time"`
+	HealthCheckInterval int `json:"healthCheckInterval,omitempty" yaml:"healthCheckInterval,omitempty" env:"postgres_pool_health_check_interval"`
 }
 
 // Store is the resolved configuration of a shell. Options are applied to it
@@ -40,35 +38,31 @@ type Store struct {
 // Option mutates the store. Options returning an error fail New immediately.
 type Option func(*Store) error
 
-// WithConfig applies a manifest config section. It is the entry point for
-// config-file driven setups; later options override individual fields.
-func WithConfig(config *manifest.PostgresConfig) Option {
+// WithConfig applies an initializer-owned config; later options override
+// individual fields.
+func WithConfig(config *Config) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil
 		}
-		opts := []Option{
-			WithURI(config.URI),
-			WithUser(url.UserPassword(config.Username, config.Password)),
+		opts := []Option{WithURI(config.URI)}
+		if config.Username != "" || config.Password != "" {
+			opts = append(opts, WithUser(url.UserPassword(config.Username, config.Password)))
+		}
+		opts = append(opts,
 			WithHost(config.Host),
 			WithPort(config.Port),
 			WithDBName(config.DBName),
 			WithSSLMode(config.SSLMode),
 			WithParam("application_name", config.AppName),
-		}
-		if config.ConnTimeout > 0 {
+		)
+		if config.ConnTimeout != 0 {
 			opts = append(opts, WithParam("connect_timeout", strconv.Itoa(config.ConnTimeout)))
 		}
 		if config.Mode != "" {
 			opts = append(opts, WithMode(Mode(config.Mode)))
 		}
-		opts = append(opts, WithPoolConfig(PoolConfig{
-			MaxConns:            config.Pool.MaxConns,
-			MinConns:            config.Pool.MinConns,
-			MaxConnLifetime:     config.Pool.MaxConnLifetime,
-			MaxConnIdleTime:     config.Pool.MaxConnIdleTime,
-			HealthCheckInterval: config.Pool.HealthCheckInterval,
-		}))
+		opts = append(opts, WithPoolConfig(config.Pool))
 		return apply(s, opts)
 	}
 }
@@ -181,7 +175,7 @@ func WithMode(mode Mode) Option {
 			s.Mode = mode
 			return nil
 		default:
-			return fmt.Errorf("invalid pginitr mode: %q", mode)
+			return fmt.Errorf("pginitr: invalid mode %q", mode)
 		}
 	}
 }

@@ -32,7 +32,7 @@ func TestZaal(t *testing.T) {
 func TestNew(t *testing.T) {
 	// The overlay reads the process environment, so a stray variable in the
 	// developer's shell would change the outcome — including panicking the
-	// success case below when it is a POSTGRES_* value.
+	// success case below when it is a manifest environment value.
 	clearEnv(t)
 
 	tests := []struct {
@@ -85,65 +85,6 @@ func TestMustNew(t *testing.T) {
 			}
 		}()
 		_ = manifest.MustNew("nonexistent.cue", "nonexistent.env")
-	})
-}
-
-func TestPostgresCUESchema(t *testing.T) {
-	// The overlay reads the process environment, so shield the fixture from
-	// whatever the developer's own shell exports. clearEnv covers every
-	// variable by construction, so a new config field cannot be missed the
-	// way a hand-maintained list eventually would.
-	clearEnv(t)
-
-	t.Run("valid_config/ok", func(t *testing.T) {
-		cfg, err := manifest.Build("./testdata/postgres/main.cue", "nonexistent.env")
-		require.NoError(t, err)
-		require.NotNil(t, cfg.Postgres)
-
-		pg := cfg.Postgres
-		assert.Equal(t, "localhost", pg.Host)
-		assert.Equal(t, 65535, pg.Port)
-		assert.Equal(t, "testdb", pg.DBName)
-		assert.Equal(t, "require", pg.SSLMode)
-		assert.Equal(t, 5, pg.ConnTimeout)
-		assert.Equal(t, "single", pg.Mode)
-		assert.Equal(t, 10, pg.Pool.MaxConns)
-		assert.Equal(t, 2, pg.Pool.MinConns)
-		assert.Equal(t, 300, pg.Pool.MaxConnLifetime)
-		assert.Equal(t, 60, pg.Pool.MaxConnIdleTime)
-		assert.Equal(t, 30, pg.Pool.HealthCheckInterval)
-	})
-
-	t.Run("mode_defaults_to_pool/ok", func(t *testing.T) {
-		cfg, err := manifest.Build("./testdata/main.cue", "./testdata/main.env")
-		require.NoError(t, err)
-		require.NotNil(t, cfg.Postgres)
-		assert.Equal(t, "pool", cfg.Postgres.Mode)
-	})
-
-	t.Run("bad_port/error", func(t *testing.T) {
-		_, err := manifest.Build("./testdata/postgres_bad_port/main.cue", "nonexistent.env")
-		assert.Error(t, err)
-	})
-
-	t.Run("float_port/error", func(t *testing.T) {
-		_, err := manifest.Build("./testdata/postgres_float_port/main.cue", "nonexistent.env")
-		assert.Error(t, err)
-	})
-
-	t.Run("bad_mode/error", func(t *testing.T) {
-		_, err := manifest.Build("./testdata/postgres_bad_mode/main.cue", "nonexistent.env")
-		assert.Error(t, err)
-	})
-
-	t.Run("bad_sslmode/error", func(t *testing.T) {
-		_, err := manifest.Build("./testdata/postgres_bad_sslmode/main.cue", "nonexistent.env")
-		assert.Error(t, err)
-	})
-
-	t.Run("bad_pool_conns/error", func(t *testing.T) {
-		_, err := manifest.Build("./testdata/postgres_bad_pool/main.cue", "nonexistent.env")
-		assert.Error(t, err)
 	})
 }
 

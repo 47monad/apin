@@ -125,44 +125,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, 8080, cfg.Servers["main"].Port)
 	})
 
-	t.Run("PostgresConfig_struct", func(t *testing.T) {
-		cfg := manifest.PostgresConfig{
-			URI:         "postgres://localhost:2231",
-			Host:        "localhost",
-			Port:        2231,
-			Username:    "postgres",
-			Password:    "secret",
-			DBName:      "testdb",
-			SSLMode:     "require",
-			AppName:     "test-app",
-			ConnTimeout: 5,
-			Mode:        manifest.PostgresModePool,
-			Pool: manifest.PostgresPoolConfig{
-				MaxConns:            10,
-				MinConns:            2,
-				MaxConnLifetime:     300,
-				MaxConnIdleTime:     60,
-				HealthCheckInterval: 30,
-			},
-		}
-
-		assert.Equal(t, "postgres://localhost:2231", cfg.URI)
-		assert.Equal(t, "localhost", cfg.Host)
-		assert.Equal(t, 2231, cfg.Port)
-		assert.Equal(t, "postgres", cfg.Username)
-		assert.Equal(t, "secret", cfg.Password)
-		assert.Equal(t, "testdb", cfg.DBName)
-		assert.Equal(t, "require", cfg.SSLMode)
-		assert.Equal(t, "test-app", cfg.AppName)
-		assert.Equal(t, 5, cfg.ConnTimeout)
-		assert.Equal(t, "pool", cfg.Mode)
-		assert.Equal(t, 10, cfg.Pool.MaxConns)
-		assert.Equal(t, 2, cfg.Pool.MinConns)
-		assert.Equal(t, 300, cfg.Pool.MaxConnLifetime)
-		assert.Equal(t, 60, cfg.Pool.MaxConnIdleTime)
-		assert.Equal(t, 30, cfg.Pool.HealthCheckInterval)
-	})
-
 	t.Run("full_struct", func(t *testing.T) {
 		cfg := manifest.Config{
 			Name:    "test-app",
@@ -183,9 +145,6 @@ func TestConfigStructure(t *testing.T) {
 				Options: manifest.MongodbOptions{
 					ReplicaSet: "rs0",
 				},
-			},
-			Postgres: &manifest.PostgresConfig{
-				URI: "localhost:2213",
 			},
 			RabbitMQ: &manifest.RabbitMQConfig{
 				URI: "amqp://guest:guest@localhost:5672/",
@@ -230,9 +189,6 @@ func TestConfigStructure(t *testing.T) {
 		require.NotNil(t, cfg.Mongodb)
 		assert.Equal(t, "mongodb://localhost:27017", cfg.Mongodb.URI)
 		assert.Equal(t, "user", cfg.Mongodb.Username)
-
-		require.NotNil(t, cfg.Postgres)
-		assert.Equal(t, "localhost:2213", cfg.Postgres.URI)
 
 		require.NotNil(t, cfg.RabbitMQ)
 		assert.Equal(t, "amqp://guest:guest@localhost:5672/", cfg.RabbitMQ.URI)

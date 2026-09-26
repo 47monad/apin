@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
+	github.com/47monad/apin/config v0.0.0
 	github.com/47monad/apin/initrs/grpcinitr v0.0.0
 	github.com/47monad/apin/initrs/pginitr v0.0.0
 	github.com/47monad/apin/initrs/zapinitr v0.0.0
@@ -54,6 +55,8 @@ require (
 )
 
 replace github.com/47monad/apin => ../..
+
+replace github.com/47monad/apin/config => ../../config
 
 replace github.com/47monad/apin/initrs/grpcinitr => ../../initrs/grpcinitr
 

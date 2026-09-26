@@ -60,23 +60,6 @@ func (e EnvVars) Lookup(name string) (string, bool) {
 	return value, true
 }
 
-// hasPrefix reports whether any variable visible to the overlay — the process
-// environment or the parsed file — starts with prefix.
-func (e EnvVars) hasPrefix(prefix string) bool {
-	for _, entry := range os.Environ() {
-		name, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(name, prefix) {
-			return true
-		}
-	}
-	for name := range e {
-		if strings.HasPrefix(name, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
 // Overlay applies the variables to cfg. The process environment takes
 // precedence over the parsed file, and both take precedence over the values
 // decoded from the manifest. The process environment is only read, never
@@ -85,19 +68,9 @@ func (e EnvVars) Overlay(cfg *Config) error {
 	if cfg == nil {
 		return errors.New("config is nil")
 	}
-	ensureOptionalSections(cfg, e)
-
 	val := reflect.ValueOf(cfg).Elem()
 	if err := setFields(val, "", e.Lookup); err != nil {
 		return err
-	}
-
-	// Environment values bypass the CUE schema (see Build), so validate
-	// constraints that the schema would otherwise enforce.
-	if cfg.Postgres != nil {
-		if err := cfg.Postgres.Validate(); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -107,18 +80,6 @@ func (e EnvVars) Overlay(cfg *Config) error {
 // [EnvVars.Overlay] with a set from [ParseEnvFile] to include a .env file.
 func LoadEnvVars(cfg *Config) error {
 	return EnvVars(nil).Overlay(cfg)
-}
-
-// ensureOptionalSections allocates optional config sections that are
-// absent from the CUE file when environment variables matching their
-// prefix are set. Currently only the postgres section supports this.
-func ensureOptionalSections(cfg *Config, env EnvVars) {
-	if cfg.Postgres != nil {
-		return
-	}
-	if env.hasPrefix("POSTGRES_") {
-		cfg.Postgres = &PostgresConfig{}
-	}
 }
 
 func setFields(val reflect.Value, ctx string, lookup func(string) (string, bool)) error {

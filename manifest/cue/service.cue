@@ -20,7 +20,6 @@ import (
   mode: *"normal" | #Mode
   logging: log.config
   mongodb?: db.mongodb
-  postgres?: db.postgres
   etcd?: db.etcd
   rabbitmq?: broker.rabbitmq
   prometheus?: monitoring.prometheus
@@ -29,4 +28,3 @@ import (
 }
 
 service: #Schema
-

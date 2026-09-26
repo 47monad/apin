@@ -102,6 +102,9 @@ func newStore(opts []Option) (*Store, error) {
 	if store.URI.User == nil && store.URI.Host == "" && store.URI.Path == "" {
 		return nil, fmt.Errorf("pginitr: no postgres configuration provided; pass WithConfig, WithURI, or connection options such as WithHost/WithDBName")
 	}
+	if err := validateStore(store); err != nil {
+		return nil, err
+	}
 
 	return store, nil
 }

@@ -1,6 +1,5 @@
-// Package main is a minimal apin service: apin.New loads the service
-// manifest, three initrs (logging, postgres, grpc) turn its config sections
-// into shells, and the apin.App it returned owns the lifecycle.
+// Package main is a minimal service: the application defines the aggregate
+// configuration it needs, and apin.App owns the lifecycle.
 //
 // Run it with a local postgres matching config.json; SIGINT/SIGTERM shut
 // everything down in reverse initialization order.
@@ -13,27 +12,31 @@ import (
 	"net"
 
 	"github.com/47monad/apin"
+	"github.com/47monad/apin/config"
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
+	"github.com/47monad/apin/manifest"
 )
+
+type serviceConfig struct {
+	Name     string                 `json:"name" yaml:"name"`
+	Logging  manifest.LoggingConfig `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
+	GRPC     *manifest.GRPCConfig   `json:"grpc" yaml:"grpc"`
+}
 
 func main() {
 	ctx := context.Background()
 
-	// Parse the config file. The env file is optional.
-	app, err := apin.New(
-		apin.WithConfig("config.json"),
-		apin.WithEnv(".env"),
-	)
-	if err != nil {
+	var cfg serviceConfig
+	if err := config.Load("config.json", "", &cfg); err != nil {
 		log.Fatal(err)
 	}
-	cfg := app.Config()
+	app := apin.NewApp()
 
-	// Logger initr: cross-cutting, returns apin.LoggerShell. It needs the
-	// config apin.New just loaded, and the app needs its logger, so the two
-	// meet here: RegisterLogger installs it after construction.
+	// Logger initr: cross-cutting, returns apin.LoggerShell. RegisterLogger
+	// installs it for lifecycle events.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)

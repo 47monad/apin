@@ -131,15 +131,6 @@ func TestBuildEnvPrecedence(t *testing.T) {
 		assert.Equal(t, "info", cfg.Logging.Level)
 	})
 
-	t.Run("postgres section is allocated from the env file alone", func(t *testing.T) {
-		// The section is missing from the manifest; only a POSTGRES_*
-		// variable brings it back, and the file has to count.
-		clearEnv(t)
-		cfg, err := buildWith(t, `{name: "prec"}`, "POSTGRES_HOST=db-from-file\n")
-		require.NoError(t, err)
-		require.NotNil(t, cfg.Postgres)
-		assert.Equal(t, "db-from-file", cfg.Postgres.Host)
-	})
 }
 
 // TestBuildConcurrent covers the other half of the issue: with the env file

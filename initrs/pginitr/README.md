@@ -11,7 +11,18 @@ go get github.com/47monad/apin/initrs/pginitr
 ## Usage
 
 ```go
-// config-file driven
+import "github.com/47monad/apin/config"
+
+// The application owns the aggregate; pginitr owns its PostgreSQL section.
+type serviceConfig struct {
+	Name     string          `json:"name" yaml:"name"`
+	Postgres *pginitr.Config `json:"postgres" yaml:"postgres"`
+}
+
+var cfg serviceConfig
+if err := config.Load("config.json", ".env", &cfg); err != nil {
+	panic(err)
+}
 dbShell, err := pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres))
 
 // config file + per-field overrides (later options win)
@@ -59,7 +70,7 @@ automatic reconnection — the pool is the default for a reason.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.PostgresConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*pginitr.Config)` | apply initializer-owned PostgreSQL configuration |
 | `WithURI(uri string)` | merge connection details from a postgres URI; query params preserved unless overridden later |
 | `WithUser(*url.Userinfo)` | explicit credentials; takes precedence over URI-derived ones |
 | `WithHost(host string)` | database host |
@@ -86,7 +97,7 @@ type PoolConfig struct {
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.PostgresConfig` field by field: `URI`, `Host`,
+`WithConfig` maps `*pginitr.Config` field by field: `URI`, `Host`,
 `Port` (int), `Username`/`Password`, `DBName`, `SSLMode` → `sslmode`,
 `AppName` → `application_name`, `ConnTimeout` → `connect_timeout`, `Mode`
 (`"pool"`/`"conn"`), and the `Pool` block. Any of these can be overridden by

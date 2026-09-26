@@ -70,9 +70,7 @@ func TestLoadEnvFile(t *testing.T) {
 func TestLoadEnvVars(t *testing.T) {
 	// LoadEnvVars reads the process environment, so shield the whole tree
 	// from the developer's own shell. Each subtest then sets only what it is
-	// about, and t.Setenv restores it when the subtest ends. Without this,
-	// an ambient POSTGRES_* value is overlaid too and its validation can
-	// fail these subtests.
+	// about, and t.Setenv restores it when the subtest ends.
 	clearEnv(t)
 
 	t.Run("nil_config/error", func(t *testing.T) {
@@ -109,15 +107,13 @@ func TestLoadEnvVars(t *testing.T) {
 		t.Setenv("MONGODB_USERNAME", "testuser")
 		t.Setenv("MONGODB_PASSWORD", "testpass")
 		t.Setenv("MONGODB_DBNAME", "testdb")
-		t.Setenv("POSTGRES_URI", "postgres://localhost:2134")
 
 		cfg := &manifest.Config{
-			Name:     "test-app",
-			Title:    "Test App",
-			Version:  "1.0.0",
-			Logging:  manifest.LoggingConfig{},
-			Mongodb:  &manifest.MongodbConfig{},
-			Postgres: &manifest.PostgresConfig{},
+			Name:    "test-app",
+			Title:   "Test App",
+			Version: "1.0.0",
+			Logging: manifest.LoggingConfig{},
+			Mongodb: &manifest.MongodbConfig{},
 		}
 
 		err := manifest.LoadEnvVars(cfg)
@@ -128,7 +124,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "testuser", cfg.Mongodb.Username)
 		assert.Equal(t, "testpass", cfg.Mongodb.Password)
 		assert.Equal(t, "testdb", cfg.Mongodb.DBName)
-		assert.Equal(t, "postgres://localhost:2134", cfg.Postgres.URI)
 	})
 
 	// MONGODB_DB_NAME is the standardized name; the legacy MONGODB_DBNAME
@@ -144,83 +139,6 @@ func TestLoadEnvVars(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, "testdb", cfg.Mongodb.DBName)
-	})
-
-	t.Run("load_postgres_vars/ok", func(t *testing.T) {
-		t.Setenv("POSTGRES_HOST", "localhost")
-		t.Setenv("POSTGRES_PORT", "5432")
-		t.Setenv("POSTGRES_USERNAME", "postgres")
-		t.Setenv("POSTGRES_PASSWORD", "secret")
-		t.Setenv("POSTGRES_DB_NAME", "testdb")
-		t.Setenv("POSTGRES_SSL_MODE", "require")
-		t.Setenv("POSTGRES_APP_NAME", "test-app")
-		t.Setenv("POSTGRES_CONN_TIMEOUT", "5")
-		t.Setenv("POSTGRES_MODE", "single")
-		t.Setenv("POSTGRES_POOL_MAX_CONNS", "10")
-		t.Setenv("POSTGRES_POOL_MIN_CONNS", "2")
-		t.Setenv("POSTGRES_POOL_MAX_CONN_LIFETIME", "300")
-		t.Setenv("POSTGRES_POOL_MAX_CONN_IDLE_TIME", "60")
-		t.Setenv("POSTGRES_POOL_HEALTH_CHECK_INTERVAL", "30")
-
-		cfg := &manifest.Config{
-			Postgres: &manifest.PostgresConfig{},
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-
-		pg := cfg.Postgres
-		assert.Equal(t, "localhost", pg.Host)
-		assert.Equal(t, 5432, pg.Port)
-		assert.Equal(t, "postgres", pg.Username)
-		assert.Equal(t, "secret", pg.Password)
-		assert.Equal(t, "testdb", pg.DBName)
-		assert.Equal(t, "require", pg.SSLMode)
-		assert.Equal(t, "test-app", pg.AppName)
-		assert.Equal(t, 5, pg.ConnTimeout)
-		assert.Equal(t, "single", pg.Mode)
-		assert.Equal(t, 10, pg.Pool.MaxConns)
-		assert.Equal(t, 2, pg.Pool.MinConns)
-		assert.Equal(t, 300, pg.Pool.MaxConnLifetime)
-		assert.Equal(t, 60, pg.Pool.MaxConnIdleTime)
-		assert.Equal(t, 30, pg.Pool.HealthCheckInterval)
-	})
-
-	// An optional section absent from the CUE file is allocated when a
-	// matching environment variable is present.
-	t.Run("postgres_section_allocated_from_env/ok", func(t *testing.T) {
-		t.Setenv("POSTGRES_URI", "postgres://localhost:2134/testdb")
-
-		cfg := &manifest.Config{
-			// Postgres is nil
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-
-		require.NotNil(t, cfg.Postgres)
-		assert.Equal(t, "postgres://localhost:2134/testdb", cfg.Postgres.URI)
-	})
-
-	t.Run("postgres_section_not_allocated_without_env/ok", func(t *testing.T) {
-		cfg := &manifest.Config{}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-
-		assert.Nil(t, cfg.Postgres)
-	})
-
-	t.Run("postgres_env_var_validation/error", func(t *testing.T) {
-		t.Setenv("POSTGRES_MODE", "garbage")
-
-		cfg := &manifest.Config{
-			Postgres: &manifest.PostgresConfig{},
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid mode")
 	})
 
 	t.Run("load_numeric_vars/ok", func(t *testing.T) {
