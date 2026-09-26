@@ -40,6 +40,16 @@ func TestNewRejectsInvalidPort(t *testing.T) {
 	require.ErrorContains(t, err, "httpinitr: port must be between 1 and 65535")
 }
 
+func TestFinalPortValidationAllowsLaterOverride(t *testing.T) {
+	shell, err := httpinitr.New(context.Background(),
+		httpinitr.WithConfig(&httpinitr.Config{Port: 65536}),
+		httpinitr.WithPort(8123),
+	)
+	require.NoError(t, err)
+	require.Equal(t, ":8123", shell.Server.Addr)
+	require.NoError(t, shell.Close(context.Background()))
+}
+
 func TestCloseClosesListenerBeforeServeStarts(t *testing.T) {
 	probe, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

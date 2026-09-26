@@ -52,23 +52,23 @@ func MustNew(ctx context.Context, opts ...Option) *ServerShell {
 // New constructs an HTTP server without binding its port. Applications can
 // configure the server further through Server before serving it.
 func New(_ context.Context, opts ...Option) (*ServerShell, error) {
-	store := &Store{Port: defaultPort}
-	if err := apply(store, opts); err != nil {
+	config := &resolvedConfig{port: defaultPort}
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
-	if store.Port == 0 {
-		store.Port = defaultPort
+	if config.port == 0 {
+		config.port = defaultPort
 	}
-	if store.Port < 1 || store.Port > 65535 {
-		return nil, fmt.Errorf("httpinitr: port must be between 1 and 65535, got %d", store.Port)
+	if config.port < 1 || config.port > 65535 {
+		return nil, fmt.Errorf("httpinitr: port must be between 1 and 65535, got %d", config.port)
 	}
-	if store.Handler == nil {
-		store.Handler = http.NewServeMux()
+	if config.handler == nil {
+		config.handler = http.NewServeMux()
 	}
 
 	server := &http.Server{
-		Addr:    net.JoinHostPort("", strconv.Itoa(store.Port)),
-		Handler: store.Handler,
+		Addr:    net.JoinHostPort("", strconv.Itoa(config.port)),
+		Handler: config.handler,
 	}
 	return &ServerShell{Server: server}, nil
 }

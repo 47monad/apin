@@ -39,6 +39,10 @@ and `Server` exposes the native `*http.Server` for additional configuration.
 connections if the context deadline expires. Track the shell with the
 application so the application owns shutdown policy.
 
+Options are sealed: callers can compose the named options but cannot mutate
+httpinitr's private construction state. Advanced native HTTP server settings
+remain available through `ServerShell.Server`.
+
 For multiple named listeners, keep a `map[string]httpinitr.Config` in the
 application aggregate and create one tracked shell per entry. The runnable
 example preserves the former named-server configuration shape this way.
