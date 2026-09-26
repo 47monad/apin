@@ -4,13 +4,6 @@ type LoggingConfig struct {
 	Level string `json:"level" env:"log_level"`
 }
 
-type EtcdConfig struct {
-	Endpoints string `json:"endpoints" env:"etcd_endpoints"`
-	Username  string `json:"username" env:"etcd_username"`
-	Password  string `json:"password" env:"etcd_password"`
-	Timeout   int    `json:"timeout" env:"etcd_timeout"`
-}
-
 type RabbitMQConfig struct {
 	URI              string `json:"uri" env:"rabbitmq_uri"`
 	MinRetryInterval int    `json:"minRetryInterval"`
@@ -57,7 +50,6 @@ type Config struct {
 	Mode       string            `json:"mode" env:"mode"`
 	Host       string            `json:"host" env:"host"`
 	Logging    LoggingConfig     `json:"logging"`
-	Etcd       *EtcdConfig       `json:"etcd,omitempty"`
 	RabbitMQ   *RabbitMQConfig   `json:"rabbitmq,omitempty"`
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty"`
 	GRPC       *GRPCConfig       `json:"grpc,omitempty"`

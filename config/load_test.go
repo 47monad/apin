@@ -27,6 +27,10 @@ type pointerConfig struct {
 	Nested *nestedConfig `json:"nested" yaml:"nested"`
 }
 
+type pointerIntConfig struct {
+	Timeout *int `json:"timeout" yaml:"timeout" env:"test_timeout"`
+}
+
 func writeFile(t *testing.T, name, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name)
@@ -129,6 +133,27 @@ func TestLoadAppliesEnvironmentToOptionalPointer(t *testing.T) {
 	}
 	if withEnv.Nested == nil || withEnv.Nested.Host != "env-host" {
 		t.Fatalf("Load() nested config = %+v, want host env-host", withEnv.Nested)
+	}
+}
+
+func TestLoadAppliesEnvironmentToOptionalScalarPointer(t *testing.T) {
+	t.Setenv("TEST_TIMEOUT", "9")
+	configPath := writeFile(t, "pointer.json", `{"timeout":5}`)
+	envPath := writeFile(t, "pointer.env", "TEST_TIMEOUT=8\n")
+	var destination pointerIntConfig
+	if err := config.Load(configPath, envPath, &destination); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if destination.Timeout == nil || *destination.Timeout != 9 {
+		t.Fatalf("Load() timeout = %v, want process value 9", destination.Timeout)
+	}
+
+	t.Setenv("TEST_TIMEOUT", "")
+	if err := config.Load(configPath, envPath, &destination); err != nil {
+		t.Fatalf("Load() with empty process value error = %v", err)
+	}
+	if destination.Timeout == nil || *destination.Timeout != 8 {
+		t.Fatalf("Load() timeout = %v, want dotenv value 8", destination.Timeout)
 	}
 }
 

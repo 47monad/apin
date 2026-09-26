@@ -1,9 +1,6 @@
 service: {
   name: "test"
   mode: "debug"
-  etcd: {
-    timeout: 10
-  }
   rabbitmq: {}
   // logging: {
   //   level: "error"

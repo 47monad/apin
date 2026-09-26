@@ -10,7 +10,17 @@ go get github.com/47monad/apin/initrs/etcdinitr
 ## Usage
 
 ```go
-// config-file driven
+// Applications compose only the configuration they use.
+type serviceConfig struct {
+	Name string            `json:"name" yaml:"name"`
+	Etcd *etcdinitr.Config `json:"etcd" yaml:"etcd"`
+}
+
+var cfg serviceConfig
+if err := config.Load("service.yaml", ".env", &cfg); err != nil {
+	return err
+}
+
 etcdShell, err := etcdinitr.New(ctx, etcdinitr.WithConfig(cfg.Etcd))
 
 // config file + overrides
@@ -42,7 +52,7 @@ type Shell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.EtcdConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*etcdinitr.Config)` | apply initializer-owned configuration |
 | `WithEndpoints(endpoints []string)` | etcd endpoints |
 | `WithUsername(username string)` | auth username |
 | `WithPassword(password string)` | auth password |
@@ -50,9 +60,11 @@ type Shell struct {
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.EtcdConfig`: comma-separated `Endpoints`,
-`Username`, `Password`, and `Timeout` (seconds). Any of these can be
-overridden by a later option.
+`Config` is decoded by the application's loader, not by etcdinitr. `Endpoints`
+remains comma-separated and `Timeout` is an optional positive number of
+seconds. An omitted timeout leaves the native client's timeout unset, while an
+explicit zero or negative timeout is rejected. Later options override
+individual configured values.
 
 ## Lifecycle
 

@@ -20,10 +20,8 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{
-		Opts: &clientv3.Config{},
-	}
-	if err := apply(store, opts); err != nil {
+	store, err := newStore(opts)
+	if err != nil {
 		return nil, err
 	}
 
@@ -33,6 +31,17 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	}
 
 	return &Shell{Client: client}, nil
+}
+
+func newStore(opts []Option) (*Store, error) {
+	store := &Store{Opts: &clientv3.Config{}}
+	if err := apply(store, opts); err != nil {
+		return nil, err
+	}
+	if store.Opts.DialTimeout < 0 {
+		return nil, fmt.Errorf("etcd dial timeout must not be negative")
+	}
+	return store, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {

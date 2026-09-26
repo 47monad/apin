@@ -164,6 +164,12 @@ func applyEnv(value reflect.Value, prefix, path string, vars map[string]string) 
 }
 
 func setEnvValue(field reflect.Value, raw string) error {
+	if field.Kind() == reflect.Pointer {
+		if field.IsNil() {
+			field.Set(reflect.New(field.Type().Elem()))
+		}
+		return setEnvValue(field.Elem(), raw)
+	}
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(raw)

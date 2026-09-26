@@ -1,12 +1,21 @@
 package etcdinitr
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+// Config contains etcd connection settings owned by etcdinitr.
+// Timeout is optional, expressed in seconds, and must be positive when set.
+type Config struct {
+	Endpoints string `json:"endpoints" yaml:"endpoints" env:"etcd_endpoints"`
+	Username  string `json:"username" yaml:"username" env:"etcd_username"`
+	Password  string `json:"password" yaml:"password" env:"etcd_password"`
+	Timeout   *int   `json:"timeout,omitempty" yaml:"timeout,omitempty" env:"etcd_timeout"`
+}
 
 // Store is the resolved configuration of a shell.
 type Store struct {
@@ -17,12 +26,20 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a manifest config section. It is the entry point for
+// WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *manifest.EtcdConfig) Option {
+func WithConfig(config *Config) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil
+		}
+		if config.Timeout != nil {
+			if *config.Timeout <= 0 {
+				return fmt.Errorf("etcd timeout must be positive")
+			}
+			if uint64(*config.Timeout) > uint64(1<<63-1)/uint64(time.Second) {
+				return fmt.Errorf("etcd timeout overflows time.Duration")
+			}
 		}
 		opts := []Option{WithEndpoints(strings.Split(config.Endpoints, ","))}
 		if config.Username != "" {
@@ -31,8 +48,8 @@ func WithConfig(config *manifest.EtcdConfig) Option {
 		if config.Password != "" {
 			opts = append(opts, WithPassword(config.Password))
 		}
-		if config.Timeout > 0 {
-			opts = append(opts, WithTimeout(time.Duration(config.Timeout)*time.Second))
+		if config.Timeout != nil {
+			opts = append(opts, WithTimeout(time.Duration(*config.Timeout)*time.Second))
 		}
 		return apply(s, opts)
 	}

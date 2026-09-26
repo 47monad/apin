@@ -2,7 +2,6 @@ package cue
 
 import (
   "github.com/47monad/apin/manifest/cue/broker"
-  "github.com/47monad/apin/manifest/cue/db"
   "github.com/47monad/apin/manifest/cue/log"
   "github.com/47monad/apin/manifest/cue/interface"
   "github.com/47monad/apin/manifest/cue/monitoring"
@@ -19,7 +18,6 @@ import (
   env: *"dev" | #Env
   mode: *"normal" | #Mode
   logging: log.config
-  etcd?: db.etcd
   rabbitmq?: broker.rabbitmq
   prometheus?: monitoring.prometheus
   grpc?: interface.grpc
