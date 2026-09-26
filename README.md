@@ -163,10 +163,7 @@ Every initr follows the same contract, so any service reads the same way:
 `apin.App` owns the shutdown:
 
 ```go
-app, err := apin.New(apin.WithConfig("config.json"))
-if err != nil {
-	log.Fatal(err)
-}
+app := apin.NewApp()
 app.RegisterLogger(loggerShell.Logger)
 app.Track(loggerShell)
 defer app.Close(context.Background()) // manual lifecycle control
@@ -221,10 +218,8 @@ An initializer can also be configured entirely through options.
 
 ## Repository Layout
 
-- `common.go`, `app.go`, `bootstrap.go`, `config.go` — apin core (`Closer`,
-  `App`, `apin.New` and config loading)
+- `common.go`, `app.go`, `bootstrap.go` — apin core (`Closer`, `App`, and app construction)
 - `config/` — standalone JSON/YAML loading and environment overlays
-- `manifest/` — legacy CUE schema and configuration facilities
 - `closr/` — the `Closer` alias, kept for compatibility
 - `runner/` — errgroup-based concurrent runner with graceful server shutdown
 - `initrs/` — one module per service initr

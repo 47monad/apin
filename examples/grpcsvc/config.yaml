@@ -1,0 +1,24 @@
+name: grpcsvc-example
+logging:
+  level: info
+postgres:
+  host: localhost
+  port: 5432
+  username: postgres
+  password: "123456789"
+  dbName: settings
+  sslMode: prefer
+  mode: pool
+  pool:
+    maxConns: 10
+    minConns: 2
+    maxConnLifetime: 3600
+    maxConnIdleTime: 300
+    healthCheckInterval: 60
+grpc:
+  reflection: true
+  healthCheck: true
+http:
+  servers:
+    api:
+      port: 4747

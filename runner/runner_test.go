@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"github.com/47monad/apin/runner"
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
@@ -78,7 +77,7 @@ func TestHTTPServerGracefulShutdown(t *testing.T) {
 
 	started := make(chan struct{})
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddHTTPServer(&manifest.HTTPServerConfig{Port: port}, func(mux *http.ServeMux) {
+	r.AddHTTPServer(port, func(mux *http.ServeMux) {
 		mux.HandleFunc("/slow", func(w http.ResponseWriter, req *http.Request) {
 			close(started)
 			time.Sleep(work)
@@ -199,7 +198,7 @@ func TestStopReturnsErrorWhenDrainOutlivesContext(t *testing.T) {
 	defer close(release)
 
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddHTTPServer(&manifest.HTTPServerConfig{Port: port}, func(mux *http.ServeMux) {
+	r.AddHTTPServer(port, func(mux *http.ServeMux) {
 		mux.HandleFunc("/hang", func(w http.ResponseWriter, req *http.Request) {
 			<-release // never finishes within the test
 		})
@@ -295,7 +294,7 @@ func TestStopHardStopsGRPCWhenDrainOutlivesContext(t *testing.T) {
 func TestStopIsIdempotent(t *testing.T) {
 	port := freePort(t)
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddHTTPServer(&manifest.HTTPServerConfig{Port: port}, nil)
+	r.AddHTTPServer(port, nil)
 	runResult := runAsync(t, r, 5*time.Second)
 	waitForListener(t, port)
 
@@ -358,7 +357,7 @@ func TestRunDrainsServersOnParentCancel(t *testing.T) {
 	defer cancel()
 
 	r := runner.New(parent, "api", logr.Discard())
-	r.AddHTTPServer(&manifest.HTTPServerConfig{Port: port}, nil)
+	r.AddHTTPServer(port, nil)
 	r.AddHealthCheck(health.NewServer(), 10*time.Millisecond, func(context.Context) bool { return true })
 	runResult := runAsync(t, r, 5*time.Second)
 	waitForListener(t, port)
@@ -453,7 +452,7 @@ func TestHTTPServerListenErrorIsReported(t *testing.T) {
 	port := lis.Addr().(*net.TCPAddr).Port
 
 	r := runner.New(context.Background(), "api", logr.Discard())
-	r.AddHTTPServer(&manifest.HTTPServerConfig{Port: port}, nil)
+	r.AddHTTPServer(port, nil)
 
 	if err := r.Run(); err == nil {
 		t.Error("Run() error = nil, want the listen failure")

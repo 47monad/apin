@@ -7,7 +7,7 @@
 // [Runner.Context], which is what unwinds the remaining runnables.
 //
 //	r := runner.New(ctx, "api", logger).
-//		AddHTTPServer(cfg.HTTP.Servers["main"], attachRoutes).
+//		AddHTTPServer(httpPort, attachRoutes).
 //		AddGRPCServer(grpcPort, grpcSrv).
 //		AddHealthCheck(healthSrv, time.Second, isHealthy)
 //

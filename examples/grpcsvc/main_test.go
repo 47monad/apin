@@ -9,18 +9,27 @@ import (
 )
 
 func TestExampleAggregateLoadsSelectedInitializers(t *testing.T) {
-	var cfg serviceConfig
-	if err := config.Load("config.json", "", &cfg); err != nil {
-		t.Fatalf("config.Load() error = %v", err)
-	}
-	if cfg.HTTP.Servers["api"].Port != 4747 {
-		t.Errorf("HTTP.Servers[api].Port = %d, want 4747", cfg.HTTP.Servers["api"].Port)
-	}
-	if !cfg.GRPC.Reflection || !cfg.GRPC.HealthCheck {
-		t.Errorf("GRPC = %+v, want reflection and health check enabled", cfg.GRPC)
-	}
-	if cfg.Postgres == nil || cfg.Postgres.Host != "localhost" {
-		t.Errorf("Postgres = %+v, want localhost configuration", cfg.Postgres)
+	for _, path := range []string{"config.json", "config.yaml"} {
+		t.Run(path, func(t *testing.T) {
+			t.Setenv("API_HTTP_PORT", "")
+			t.Setenv("GRPC_REFLECTION", "")
+			t.Setenv("GRPC_HEALTH_CHECK", "")
+			t.Setenv("POSTGRES_HOST", "")
+
+			var cfg serviceConfig
+			if err := config.Load(path, "", &cfg); err != nil {
+				t.Fatalf("config.Load() error = %v", err)
+			}
+			if cfg.HTTP.Servers["api"].Port != 4747 {
+				t.Errorf("HTTP.Servers[api].Port = %d, want 4747", cfg.HTTP.Servers["api"].Port)
+			}
+			if !cfg.GRPC.Reflection || !cfg.GRPC.HealthCheck {
+				t.Errorf("GRPC = %+v, want reflection and health check enabled", cfg.GRPC)
+			}
+			if cfg.Postgres == nil || cfg.Postgres.Host != "localhost" {
+				t.Errorf("Postgres = %+v, want localhost configuration", cfg.Postgres)
+			}
+		})
 	}
 }
 

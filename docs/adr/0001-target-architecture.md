@@ -33,5 +33,6 @@ the loader remains format-focused. Lifecycle policy belongs to App when an
 application opts into apin orchestration. Initializers continue to expose
 their native clients through their shells.
 
-These are target dependency rules, not claims that the current implementation
-already satisfies every rule. Existing behavior remains unchanged by this ADR.
+The implementation removes the central manifest and leaves applications,
+initializers, and the standalone format-focused loader with the ownership
+described above.
