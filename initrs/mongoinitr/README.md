@@ -58,6 +58,7 @@ type Shell struct {
 | `WithTimeout(d time.Duration)` | driver connect timeout |
 | `WithDBName(name string)` | default database of the returned shell |
 | `WithPingTimeout(d time.Duration)` | readiness ping timeout; defaults to `10s` |
+| `WithNativeClientOptions(func(*options.ClientOptions) error)` | configure native driver features not represented by the named options |
 
 ## Config mapping
 
@@ -65,6 +66,10 @@ type Shell struct {
 applies the URI and database name; later options override either value. The
 initializer validates the resolved driver options before attempting a
 connection. `PingTimeout` defaults to `10s`.
+
+Options are sealed: callers can compose the named options but cannot mutate
+mongoinitr's private construction state. Native client options are the
+deliberate driver escape hatch.
 
 ## Lifecycle
 
