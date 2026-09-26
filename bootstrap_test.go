@@ -1,7 +1,6 @@
 package apin_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/47monad/apin"
@@ -9,10 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	app, err := apin.New()
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
+	app := apin.New()
 	if app == nil {
 		t.Fatal("New() app = nil")
 	}
@@ -38,24 +34,14 @@ func (s *recordingSink) Info(int, string, ...any) { s.writes++ }
 
 func (s *recordingSink) Error(error, string, ...any) { s.writes++ }
 
-func TestRegisterLoggerAndSetLogger(t *testing.T) {
-	app, err := apin.New()
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
+func TestWithLoggerAndSetLogger(t *testing.T) {
 	sink := &recordingSink{}
-	app.RegisterLogger(logr.New(sink))
+	app := apin.New(apin.WithLogger(logr.New(sink)))
 	app.Logger().Info("hello")
 	if sink.writes != 1 {
 		t.Errorf("registered logger not in use, writes = %d", sink.writes)
 	}
 
-	// SetLogger swaps the logger again; RegisterLogger(nil) is a no-op.
+	// SetLogger swaps the logger after construction.
 	app.SetLogger(logr.Discard())
-	app.RegisterLogger(logr.Logger{})
-}
-
-func TestMain(m *testing.M) {
-	os.Exit(m.Run())
 }

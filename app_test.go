@@ -30,7 +30,7 @@ func TestCloseReverseOrder(t *testing.T) {
 	var records []string
 	mu := &sync.Mutex{}
 
-	app := apin.NewApp()
+	app := apin.New()
 	shells := []*fakeShell{
 		{id: "a", records: &records, mu: mu},
 		{id: "b", records: &records, mu: mu},
@@ -56,7 +56,7 @@ func TestCloseJoinsErrors(t *testing.T) {
 	mu := &sync.Mutex{}
 
 	wantErr := errors.New("boom")
-	app := apin.NewApp()
+	app := apin.New()
 	app.Track(
 		&fakeShell{id: "a", records: &records, mu: mu},
 		&fakeShell{id: "b", err: wantErr, records: &records, mu: mu},
@@ -75,7 +75,7 @@ func TestRunClosesOnContextCancel(t *testing.T) {
 	var records []string
 	mu := &sync.Mutex{}
 
-	app := apin.NewApp()
+	app := apin.New()
 	app.Track(&fakeShell{id: "shell", records: &records, mu: mu})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -97,7 +97,7 @@ func TestRunReturnsRunnableError(t *testing.T) {
 	var records []string
 	mu := &sync.Mutex{}
 
-	app := apin.NewApp()
+	app := apin.New()
 	app.Track(&fakeShell{id: "shell", records: &records, mu: mu})
 
 	wantErr := errors.New("runnable failed")
@@ -120,7 +120,7 @@ func (slowCloser) Close(ctx context.Context) error {
 }
 
 func TestSetShutdownTimeout(t *testing.T) {
-	app := apin.NewApp()
+	app := apin.New()
 	if got, want := app.ShutdownTimeout(), 30*time.Second; got != want {
 		t.Errorf("default ShutdownTimeout() = %v, want %v", got, want)
 	}
@@ -139,7 +139,7 @@ func TestSetShutdownTimeoutBoundsShutdownPhase(t *testing.T) {
 	var records []string
 	mu := &sync.Mutex{}
 
-	app := apin.NewApp()
+	app := apin.New()
 	app.SetShutdownTimeout(50 * time.Millisecond)
 	app.Track(
 		&fakeShell{id: "fast", records: &records, mu: mu},
@@ -173,7 +173,7 @@ func TestRunStopsOnSignal(t *testing.T) {
 	var records []string
 	mu := &sync.Mutex{}
 
-	app := apin.NewApp()
+	app := apin.New()
 	app.Track(&fakeShell{id: "shell", records: &records, mu: mu})
 
 	runCtx, cancel := context.WithCancel(context.Background())

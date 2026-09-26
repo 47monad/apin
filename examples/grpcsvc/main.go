@@ -42,14 +42,12 @@ func main() {
 	if err := config.Load("config.json", "", &cfg); err != nil {
 		log.Fatal(err)
 	}
-	app := apin.NewApp()
-
 	// Logger initr returns its own shell; App owns its lifecycle and shutdown.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.RegisterLogger(loggerShell.Logger)
+	app := apin.New(apin.WithLogger(loggerShell.Logger))
 	app.Track(loggerShell)
 
 	// Postgres: config-file values, with a per-field programmatic override.

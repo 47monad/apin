@@ -21,7 +21,7 @@ loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 if err != nil {
 	return err
 }
-app.RegisterLogger(loggerShell.Logger)
+app := apin.New(apin.WithLogger(loggerShell.Logger))
 app.Track(loggerShell)
 ```
 

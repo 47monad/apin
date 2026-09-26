@@ -4,6 +4,7 @@ use (
 	.
 	./config
 	./examples/grpcsvc
+	./runner
 	./initrs/etcdinitr
 	./initrs/grpcinitr
 	./initrs/httpinitr

@@ -62,15 +62,13 @@ func main() {
 	if err := config.Load("config.json", "", &cfg); err != nil {
 		log.Fatal(err)
 	}
-	app := apin.NewApp()
-
-	// Register the logger after construction so App uses it for lifecycle logs.
+	// The logger shell provides the App's lifecycle logger.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-app.RegisterLogger(loggerShell.Logger)
-app.Track(loggerShell)
+	app := apin.New(apin.WithLogger(loggerShell.Logger))
+	app.Track(loggerShell)
 
 	dbShell, err := pginitr.New(ctx,
 		pginitr.WithConfig(cfg.Postgres), // config file values...
@@ -163,8 +161,7 @@ Every initr follows the same contract, so any service reads the same way:
 `apin.App` owns the shutdown:
 
 ```go
-app := apin.NewApp()
-app.RegisterLogger(loggerShell.Logger)
+app := apin.New(apin.WithLogger(loggerShell.Logger))
 app.Track(loggerShell)
 defer app.Close(context.Background()) // manual lifecycle control
 ```
@@ -173,7 +170,8 @@ defer app.Close(context.Background()) // manual lifecycle control
 - `app.Run(ctx, runnables...)` — start serving; on SIGINT/SIGTERM or context
   cancellation, runnables are cancelled and shells closed in reverse order,
   bounded by a shutdown timeout (default 30s, `app.SetShutdownTimeout` to tune)
-- A second signal forces an immediate exit
+- A second signal cancels cleanup more aggressively; process termination
+  remains the application's decision.
 
 `app.Close(ctx)` alone closes tracked shells in reverse order — useful for
 tests or custom lifecycles.
@@ -218,10 +216,10 @@ An initializer can also be configured entirely through options.
 
 ## Repository Layout
 
-- `common.go`, `app.go`, `bootstrap.go` — apin core (`Closer`, `App`, and app construction)
+- `common.go`, `app.go` — minimal lifecycle module (`App`, `Closer`, `Runnable`)
 - `config/` — standalone JSON/YAML loading and environment overlays
 - `closr/` — the `Closer` alias, kept for compatibility
-- `runner/` — errgroup-based concurrent runner with graceful server shutdown
+- `runner/` — separate module for concurrent HTTP/gRPC server orchestration
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
 
