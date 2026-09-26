@@ -26,8 +26,8 @@ func MustNew(ctx context.Context, opts ...Option) *ServerShell {
 }
 
 func New(ctx context.Context, opts ...Option) (*ServerShell, error) {
-	store := &ServerStore{}
-	if err := apply(store, opts); err != nil {
+	config := &resolvedConfig{}
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
 
@@ -35,22 +35,22 @@ func New(ctx context.Context, opts ...Option) (*ServerShell, error) {
 
 	serverOptions := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
-			store.Interceptors...,
+			config.interceptors...,
 		),
 	}
-	serverOptions = append(serverOptions, store.ServerOptions...)
+	serverOptions = append(serverOptions, config.serverOptions...)
 	shell.Server = grpc.NewServer(serverOptions...)
 
-	if store.HealthCheck {
+	if config.healthCheck {
 		shell.HealthServer = health.NewServer()
 		healthgrpc.RegisterHealthServer(shell.Server, shell.HealthServer)
 	}
 
-	if store.Runnable != nil {
-		store.Runnable(shell.Server)
+	if config.runnable != nil {
+		config.runnable(shell.Server)
 	}
 
-	if store.Reflection {
+	if config.reflection {
 		reflection.Register(shell.Server)
 	}
 

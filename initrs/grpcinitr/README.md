@@ -74,6 +74,9 @@ the port and any aggregation of server instances. `WithConfig` applies feature
 values, and later options override them. `WithInterceptor` and
 `WithServerOptions` are deliberate native gRPC escape hatches.
 
+Options are sealed: callers can compose the named options but cannot mutate
+grpcinitr's private construction state.
+
 ## Lifecycle
 
 `Close(ctx)` gracefully stops the server, falling back to a hard stop if the

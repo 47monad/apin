@@ -1,6 +1,8 @@
 package grpcinitr
 
 import (
+	"errors"
+
 	"google.golang.org/grpc"
 )
 
@@ -10,23 +12,30 @@ type Config struct {
 	HealthCheck bool `json:"healthCheck" yaml:"healthCheck" env:"grpc_health_check"`
 }
 
-// ServerStore is the resolved configuration of a server shell.
-type ServerStore struct {
-	Interceptors  []grpc.UnaryServerInterceptor
-	ServerOptions []grpc.ServerOption
-	HealthCheck   bool
-	Reflection    bool
-	Runnable      func(*grpc.Server)
+// resolvedConfig is private construction state owned by grpcinitr.
+type resolvedConfig struct {
+	interceptors  []grpc.UnaryServerInterceptor
+	serverOptions []grpc.ServerOption
+	healthCheck   bool
+	reflection    bool
+	runnable      func(*grpc.Server)
 }
 
-// Option mutates the store. Options are applied in the order they are passed
-// to New, so later options win.
-type Option func(*ServerStore) error
+// Option is a sealed functional option accepted by New.
+type Option interface {
+	apply(*resolvedConfig) error
+}
+
+type optionFunc func(*resolvedConfig) error
+
+func (option optionFunc) apply(config *resolvedConfig) error {
+	return option(config)
+}
 
 // WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
 func WithConfig(config *Config) Option {
-	return func(s *ServerStore) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if config == nil {
 			return nil
 		}
@@ -34,60 +43,61 @@ func WithConfig(config *Config) Option {
 			WithReflection(config.Reflection),
 			WithHealthCheck(config.HealthCheck),
 		})
-	}
+	})
 }
 
 // WithRunnable registers bootstrap logic to run against the created server,
 // such as registering service implementations.
 func WithRunnable(runnable func(server *grpc.Server)) Option {
-	return func(s *ServerStore) error {
-		s.Runnable = runnable
+	return optionFunc(func(s *resolvedConfig) error {
+		s.runnable = runnable
 		return nil
-	}
+	})
 }
 
 // WithReflection enables the gRPC reflection service.
 func WithReflection(enabled bool) Option {
-	return func(s *ServerStore) error {
-		s.Reflection = enabled
+	return optionFunc(func(s *resolvedConfig) error {
+		s.reflection = enabled
 		return nil
-	}
+	})
 }
 
 // WithHealthCheck registers the standard gRPC health checking service.
 func WithHealthCheck(enabled bool) Option {
-	return func(s *ServerStore) error {
-		s.HealthCheck = enabled
+	return optionFunc(func(s *resolvedConfig) error {
+		s.healthCheck = enabled
 		return nil
-	}
+	})
 }
 
 // WithInterceptor appends a unary interceptor. It is repeatable; each call
 // adds another interceptor, applied in the order they are registered.
 func WithInterceptor(i grpc.UnaryServerInterceptor) Option {
-	return func(s *ServerStore) error {
-		s.Interceptors = append(s.Interceptors, i)
+	return optionFunc(func(s *resolvedConfig) error {
+		s.interceptors = append(s.interceptors, i)
 		return nil
-	}
+	})
 }
 
 // WithServerOptions appends native gRPC server options. It is the escape
 // hatch for server capabilities not wrapped by grpcinitr.
 func WithServerOptions(options ...grpc.ServerOption) Option {
-	return func(s *ServerStore) error {
-		s.ServerOptions = append(s.ServerOptions, options...)
+	return optionFunc(func(s *resolvedConfig) error {
+		s.serverOptions = append(s.serverOptions, options...)
 		return nil
-	}
+	})
 }
 
-func apply(s *ServerStore, opts []Option) error {
+func apply(s *resolvedConfig, opts []Option) error {
+	var errs []error
 	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-		if err := opt(s); err != nil {
-			return err
+		if err := opt.apply(s); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
