@@ -2,6 +2,8 @@ package grpcinitr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
@@ -55,10 +57,18 @@ func New(ctx context.Context, opts ...Option) (*ServerShell, error) {
 	return shell, nil
 }
 
-// Serve serves on lis until the context is done, then gracefully stops the
-// server and returns. The result is nil after a graceful shutdown, so it can
-// be used directly as an apin.Runnable.
+// Serve serves on lis until the context is done or the native server stops.
+// It returns on context cancellation; the caller's lifecycle owner then calls
+// Close with its shutdown context so graceful stopping uses the same deadline
+// as the other tracked shells.
 func (shell *ServerShell) Serve(ctx context.Context, lis net.Listener) error {
+	if shell == nil || shell.Server == nil {
+		return errors.New("grpcinitr: cannot serve with a nil server")
+	}
+	if lis == nil {
+		return errors.New("grpcinitr: cannot serve with a nil listener")
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- shell.Server.Serve(lis)
@@ -66,10 +76,13 @@ func (shell *ServerShell) Serve(ctx context.Context, lis net.Listener) error {
 
 	select {
 	case err := <-errCh:
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return nil
+		}
 		return err
 	case <-ctx.Done():
-		shell.Server.GracefulStop()
-		<-errCh // Serve returns (or ErrServerStopped) after GracefulStop
+		// The caller's lifecycle owner closes the shell with its single
+		// shutdown context and deadline.
 		return nil
 	}
 }
@@ -79,6 +92,9 @@ func (shell *ServerShell) Serve(ctx context.Context, lis net.Listener) error {
 func (shell *ServerShell) Close(ctx context.Context) error {
 	if shell.Server == nil {
 		return nil
+	}
+	if shell.HealthServer != nil {
+		shell.HealthServer.Shutdown()
 	}
 
 	stopped := make(chan struct{})
@@ -92,6 +108,6 @@ func (shell *ServerShell) Close(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		shell.Server.Stop()
-		return nil
+		return fmt.Errorf("grpcinitr: server did not drain in time: %w", ctx.Err())
 	}
 }

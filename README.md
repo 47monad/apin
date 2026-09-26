@@ -152,7 +152,7 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection |
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
-| [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health check + reflection toggles; ctx-aware `Serve` |
+| [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
 
@@ -176,14 +176,11 @@ defer app.Close(context.Background()) // manual lifecycle control
 `app.Close(ctx)` alone closes tracked shells in reverse order — useful for
 tests or custom lifecycles.
 
-The `runner` package still works on its own for concurrent multi-server
-setups (`runner.AddGRPCServer`, `AddHTTPServer`, `AddHealthCheck`) — pass
-`runner.Run` as the App's runnable, handing it the App's context so the App's
-signal handling drives the runner's graceful shutdown, or use
-`ServerShell.Serve` for the single-server case shown above. Servers
-registered with the runner are drained by `runner.Stop`: in-flight requests
-and RPCs finish before the listener closes, and the SIGINT/SIGTERM wiring is
-documented in the package doc.
+Use each initializer shell to serve and stop its native resource. The App
+cancels runnables on shutdown, then closes tracked shells in reverse order
+with the same shutdown context and deadline. For example, `httpinitr` owns
+HTTP server shutdown and `grpcinitr` owns gRPC graceful-stop behavior; neither
+initializer installs process signal handlers.
 
 ## Configuration
 
@@ -219,7 +216,6 @@ An initializer can also be configured entirely through options.
 - `common.go`, `app.go` — minimal lifecycle module (`App`, `Closer`, `Runnable`)
 - `config/` — standalone JSON/YAML loading and environment overlays
 - `closr/` — the `Closer` alias, kept for compatibility
-- `runner/` — separate module for concurrent HTTP/gRPC server orchestration
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
 

@@ -81,3 +81,107 @@ func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
 	require.Equal(t, codes.Unimplemented, status.Code(err))
 	require.True(t, strings.Contains(err.Error(), "native server option reached"))
 }
+
+func TestRunHealthCheckUpdatesHealthServiceAndStopsOnContext(t *testing.T) {
+	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
+	require.NoError(t, err)
+	defer shell.Close(t.Context())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	checked := make(chan struct{}, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- shell.RunHealthCheck(ctx, "api", time.Millisecond, func(context.Context) bool {
+			select {
+			case checked <- struct{}{}:
+			default:
+			}
+			return false
+		})
+	}()
+
+	select {
+	case <-checked:
+	case <-time.After(time.Second):
+		t.Fatal("health checker was not called")
+	}
+	response, err := shell.HealthServer.Check(t.Context(), &grpc_health_v1.HealthCheckRequest{Service: "api"})
+	require.NoError(t, err)
+	require.Equal(t, grpc_health_v1.HealthCheckResponse_NOT_SERVING, response.Status)
+
+	cancel()
+	require.NoError(t, <-done)
+}
+
+func TestServeReturnsOnContextAndCloseStopsNativeServer(t *testing.T) {
+	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
+	require.NoError(t, err)
+
+	listener := bufconn.Listen(1024 * 1024)
+	ctx, cancel := context.WithCancel(t.Context())
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- shell.Serve(ctx, listener) }()
+
+	conn, err := grpc.NewClient("passthrough:///bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() }),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	defer conn.Close()
+	checkCtx, checkCancel := context.WithTimeout(t.Context(), time.Second)
+	defer checkCancel()
+	_, err = grpc_health_v1.NewHealthClient(conn).Check(checkCtx, &grpc_health_v1.HealthCheckRequest{})
+	require.NoError(t, err)
+
+	cancel()
+	require.NoError(t, <-serveDone)
+
+	closeCtx, closeCancel := context.WithTimeout(t.Context(), time.Second)
+	defer closeCancel()
+	require.NoError(t, shell.Close(closeCtx))
+	require.NoError(t, listener.Close())
+}
+
+func TestCloseUsesCallerDeadlineToForceStop(t *testing.T) {
+	started := make(chan struct{})
+	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithServerOptions(grpc.UnknownServiceHandler(func(_ any, stream grpc.ServerStream) error {
+		close(started)
+		<-stream.Context().Done()
+		return stream.Context().Err()
+	})))
+	require.NoError(t, err)
+
+	listener := bufconn.Listen(1024 * 1024)
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- shell.Serve(t.Context(), listener) }()
+
+	conn, err := grpc.NewClient("passthrough:///bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() }),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	invokeDone := make(chan error, 1)
+	go func() {
+		invokeDone <- conn.Invoke(context.Background(), "/unknown.Service/Method", &emptypb.Empty{}, &emptypb.Empty{})
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("request did not reach the blocking handler")
+	}
+
+	closeCtx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+	err = shell.Close(closeCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NoError(t, <-serveDone)
+	require.NoError(t, listener.Close())
+	select {
+	case <-invokeDone:
+	case <-time.After(time.Second):
+		t.Fatal("forced stop did not unblock the active request")
+	}
+}

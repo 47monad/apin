@@ -70,7 +70,7 @@ func (app *App) Track(shells ...Closer) *App {
 	return app
 }
 
-// Logger returns the app logger, handy for runners that take a logr.Logger.
+// Logger returns the app's lifecycle logger.
 func (app *App) Logger() logr.Logger {
 	return app.logger
 }

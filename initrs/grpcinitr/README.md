@@ -30,16 +30,22 @@ srvShell, err := grpcinitr.New(ctx,
 
 ## Serving
 
-`Serve` is context-aware and directly usable as an `apin.App` runnable —
-serving stops gracefully when the app shuts down:
+`Serve` is context-aware and directly usable as an `apin.App` runnable. When
+the app cancels runnable contexts, `Serve` returns; App then closes tracked
+shells with its single shutdown deadline, and the shell gracefully stops its
+native gRPC server:
 
 ```go
 lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
 
 app.Run(ctx, func(ctx context.Context) error {
-	return srvShell.Serve(ctx, lis) // graceful stop on app shutdown
+	return srvShell.Serve(ctx, lis)
 })
 ```
+
+When the standard health service is enabled, `RunHealthCheck(ctx, service,
+interval, checker)` periodically updates its status and returns when `ctx` is
+cancelled. The checker should honor its context.
 
 ## Shell
 
@@ -71,9 +77,9 @@ values, and later options override them. `WithInterceptor` and
 ## Lifecycle
 
 `Close(ctx)` gracefully stops the server, falling back to a hard stop if the
-context expires — bounded, so it cannot hang `apin.App` shutdown. Safe to
-call after `Serve` already shut the server down. Implementing `apin.Closer`,
-it slots directly into `apin.App.Track`.
+App's shutdown context expires. It does not create a separate deadline or
+handle process signals. Safe to call after `Serve` returns. Implementing
+`apin.Closer`, it slots directly into `apin.App.Track`.
 
 Track order matters: track the server shell *after* the databases it depends
 on, so reverse-order shutdown stops serving before closing connections.
