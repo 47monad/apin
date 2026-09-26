@@ -1,9 +1,10 @@
 package rmqinitr
 
 import (
+	"fmt"
+	"math"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"github.com/go-logr/logr"
 )
 
@@ -11,6 +12,14 @@ const (
 	defaultMinRetryInterval = time.Second
 	defaultMaxRetryInterval = 30 * time.Second
 )
+
+// Config contains RabbitMQ connection settings owned by rmqinitr. Retry
+// intervals are optional, expressed in seconds, and validated when set.
+type Config struct {
+	URI              string `json:"uri" yaml:"uri" env:"rabbitmq_uri"`
+	MinRetryInterval *int   `json:"minRetryInterval,omitempty" yaml:"minRetryInterval,omitempty" env:"rabbitmq_min_retry_interval"`
+	MaxRetryInterval *int   `json:"maxRetryInterval,omitempty" yaml:"maxRetryInterval,omitempty" env:"rabbitmq_max_retry_interval"`
+}
 
 // Store is the resolved configuration of a shell.
 type Store struct {
@@ -25,22 +34,43 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a manifest config section. It is the entry point for
+// WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *manifest.RabbitMQConfig) Option {
+func WithConfig(config *Config) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil
 		}
 		opts := []Option{WithURI(config.URI)}
-		if config.MinRetryInterval > 0 {
-			opts = append(opts, WithMinRetryInterval(time.Duration(config.MinRetryInterval)*time.Second))
+		if config.MinRetryInterval != nil {
+			if *config.MinRetryInterval <= 0 {
+				return fmt.Errorf("rmqinitr: min retry interval must be positive")
+			}
+			duration, err := secondsDuration(*config.MinRetryInterval)
+			if err != nil {
+				return fmt.Errorf("rmqinitr: min retry interval: %w", err)
+			}
+			opts = append(opts, WithMinRetryInterval(duration))
 		}
-		if config.MaxRetryInterval > 0 {
-			opts = append(opts, WithMaxRetryInterval(time.Duration(config.MaxRetryInterval)*time.Second))
+		if config.MaxRetryInterval != nil {
+			if *config.MaxRetryInterval <= 1 {
+				return fmt.Errorf("rmqinitr: max retry interval must be greater than 1 second")
+			}
+			duration, err := secondsDuration(*config.MaxRetryInterval)
+			if err != nil {
+				return fmt.Errorf("rmqinitr: max retry interval: %w", err)
+			}
+			opts = append(opts, WithMaxRetryInterval(duration))
 		}
 		return apply(s, opts)
 	}
+}
+
+func secondsDuration(seconds int) (time.Duration, error) {
+	if uint64(seconds) > uint64(math.MaxInt64)/uint64(time.Second) {
+		return 0, fmt.Errorf("%d seconds overflows time.Duration", seconds)
+	}
+	return time.Duration(seconds) * time.Second, nil
 }
 
 // WithURI sets the amqp connection URI.

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/47monad/apin/initrs/rmqinitr" // Replace with your actual module path
-	"github.com/47monad/apin/manifest"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
@@ -23,6 +22,8 @@ var (
 	rabbitmqURI string
 	container   *rmqtc.RabbitMQContainer
 )
+
+func seconds(value int) *int { return &value }
 
 func TestMain(m *testing.M) {
 	var err error
@@ -60,7 +61,7 @@ func TestMain(m *testing.M) {
 
 func TestNewFromConfig_ValidConnection(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{URI: rabbitmqURI}))
+		rmqinitr.WithConfig(&rmqinitr.Config{URI: rabbitmqURI}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
 
@@ -77,7 +78,7 @@ func TestNewFromConfig_ValidConnection(t *testing.T) {
 func TestNewRabbitManager_InvalidConnection(t *testing.T) {
 	// Synchronous connect must fail on an invalid connection.
 	_, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: "amqp://invalid:invalid@localhost:9999/",
 		}))
 	require.Error(t, err)
@@ -85,7 +86,7 @@ func TestNewRabbitManager_InvalidConnection(t *testing.T) {
 
 func TestNewRabbitManager_InvalidConnectionLazy(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: "amqp://invalid:invalid@localhost:9999/",
 		}),
 		rmqinitr.WithLazyConnect())
@@ -99,7 +100,7 @@ func TestNewRabbitManager_InvalidConnectionLazy(t *testing.T) {
 
 func TestGetChannel_WhenHealthy(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
@@ -120,10 +121,10 @@ func TestGetChannel_WhenHealthy(t *testing.T) {
 
 func TestGetChannel_WhenUnhealthy(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI:              "amqp://invalid:invalid@localhost:9999/",
-			MinRetryInterval: 1,
-			MaxRetryInterval: 2,
+			MinRetryInterval: seconds(1),
+			MaxRetryInterval: seconds(2),
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
@@ -138,7 +139,7 @@ func TestGetChannel_WhenUnhealthy(t *testing.T) {
 
 func TestGetChannel_AfterClose(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
@@ -163,10 +164,10 @@ func TestGetChannel_AfterClose(t *testing.T) {
 
 func TestReconnection_AfterConnectionLoss(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI:              rabbitmqURI,
-			MaxRetryInterval: 4,
-			MinRetryInterval: 1,
+			MaxRetryInterval: seconds(4),
+			MinRetryInterval: seconds(1),
 		}))
 	require.NoError(t, err)
 	defer shell.Close(context.Background())
@@ -202,7 +203,7 @@ func TestReconnection_AfterConnectionLoss(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
@@ -265,10 +266,10 @@ func TestConcurrentAccess(t *testing.T) {
 
 func TestWaitForHealth_Timeout(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI:              "amqp://invalid:invalid@localhost:9999/",
-			MaxRetryInterval: 5,
-			MinRetryInterval: 1,
+			MaxRetryInterval: seconds(5),
+			MinRetryInterval: seconds(1),
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
@@ -284,7 +285,7 @@ func TestWaitForHealth_Timeout(t *testing.T) {
 
 func TestWaitForHealth_Success(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
@@ -299,7 +300,7 @@ func TestWaitForHealth_Success(t *testing.T) {
 
 func TestClose_MultipleCallsSafe(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
@@ -319,10 +320,10 @@ func TestExponentialBackoff(t *testing.T) {
 	start := time.Now()
 
 	shell, err := rmqinitr.New(context.Background(),
-		rmqinitr.WithConfig(&manifest.RabbitMQConfig{
+		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI:              "amqp://invalid:invalid@localhost:9999/",
-			MaxRetryInterval: 4,
-			MinRetryInterval: 1,
+			MaxRetryInterval: seconds(4),
+			MinRetryInterval: seconds(1),
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)

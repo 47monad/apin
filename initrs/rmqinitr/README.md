@@ -11,7 +11,12 @@ go get github.com/47monad/apin/initrs/rmqinitr
 ## Usage
 
 ```go
-// config-file driven
+// application-owned aggregate config
+type serviceConfig struct {
+	Name     string           `json:"name" yaml:"name"`
+	RabbitMQ *rmqinitr.Config `json:"rabbitmq" yaml:"rabbitmq"`
+}
+
 mqShell, err := rmqinitr.New(ctx, rmqinitr.WithConfig(cfg.RabbitMQ))
 
 // config file + overrides
@@ -48,7 +53,7 @@ channel state.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.RabbitMQConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*rmqinitr.Config)` | apply an initializer-owned config section |
 | `WithURI(uri string)` | amqp connection URI |
 | `WithMinRetryInterval(d time.Duration)` | initial reconnect backoff; defaults to `1s` |
 | `WithMaxRetryInterval(d time.Duration)` | backoff cap; defaults to `30s`; must not be lower than min |
@@ -57,8 +62,9 @@ channel state.
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.RabbitMQConfig`: `URI`, and `MinRetryInterval` /
-`MaxRetryInterval` (seconds). It never mutates the config you pass in. Any
+`WithConfig` maps `*rmqinitr.Config`: `URI`, and `MinRetryInterval` /
+`MaxRetryInterval` (seconds). Omitted retry intervals default to 1 and 30
+seconds. It never mutates the config you pass in. Any
 value can be overridden by a later option.
 
 ## Lifecycle

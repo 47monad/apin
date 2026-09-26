@@ -155,7 +155,6 @@ func TestLoadEnvVars(t *testing.T) {
 		t.Setenv("MODE", "release")
 		t.Setenv("HOST", "0.0.0.0")
 		t.Setenv("LOG_LEVEL", "info")
-		t.Setenv("RABBITMQ_URI", "amqp://guest:guest@rabbitmq:5672/")
 		t.Setenv("MAIN_GRPC_PORT", "5000")
 		t.Setenv("MAIN_HTTP_PORT", "8000")
 
@@ -164,7 +163,6 @@ func TestLoadEnvVars(t *testing.T) {
 			Title:    "Production App",
 			Version:  "1.0.0",
 			Logging:  manifest.LoggingConfig{},
-			RabbitMQ: &manifest.RabbitMQConfig{},
 			GRPC:     &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
 			HTTP:     &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
 		}
@@ -176,7 +174,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "release", cfg.Mode)
 		assert.Equal(t, "0.0.0.0", cfg.Host)
 		assert.Equal(t, "info", cfg.Logging.Level)
-		assert.Equal(t, "amqp://guest:guest@rabbitmq:5672/", cfg.RabbitMQ.URI)
 		assert.Equal(t, 5000, cfg.GRPC.Servers["main"].Port)
 		assert.Equal(t, 8000, cfg.HTTP.Servers["main"].Port)
 	})

@@ -1,7 +1,6 @@
 service: {
   name: "test"
   mode: "debug"
-  rabbitmq: {}
   // logging: {
   //   level: "error"
   // }

@@ -4,12 +4,6 @@ type LoggingConfig struct {
 	Level string `json:"level" env:"log_level"`
 }
 
-type RabbitMQConfig struct {
-	URI              string `json:"uri" env:"rabbitmq_uri"`
-	MinRetryInterval int    `json:"minRetryInterval"`
-	MaxRetryInterval int    `json:"maxRetryInterval"`
-}
-
 type PrometheusConfig struct {
 	GRPCMetrics bool `json:"grpcMetrics"`
 }
@@ -50,7 +44,6 @@ type Config struct {
 	Mode       string            `json:"mode" env:"mode"`
 	Host       string            `json:"host" env:"host"`
 	Logging    LoggingConfig     `json:"logging"`
-	RabbitMQ   *RabbitMQConfig   `json:"rabbitmq,omitempty"`
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty"`
 	GRPC       *GRPCConfig       `json:"grpc,omitempty"`
 	HTTP       *HTTPConfig       `json:"http,omitempty"`

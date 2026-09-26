@@ -16,13 +16,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "debug", cfg.Level)
 	})
 
-	t.Run("RabbitMQConfig_struct", func(t *testing.T) {
-		cfg := manifest.RabbitMQConfig{
-			URI: "amqp://guest:guest@localhost:5672/",
-		}
-		assert.Equal(t, "amqp://guest:guest@localhost:5672/", cfg.URI)
-	})
-
 	t.Run("PrometheusConfig_struct", func(t *testing.T) {
 		cfg := manifest.PrometheusConfig{
 			GRPCMetrics: true,
@@ -109,9 +102,6 @@ func TestConfigStructure(t *testing.T) {
 			Logging: manifest.LoggingConfig{
 				Level: "debug",
 			},
-			RabbitMQ: &manifest.RabbitMQConfig{
-				URI: "amqp://guest:guest@localhost:5672/",
-			},
 			Prometheus: &manifest.PrometheusConfig{
 				GRPCMetrics: true,
 			},
@@ -149,9 +139,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "localhost", cfg.Host)
 		assert.Equal(t, "debug", cfg.Logging.Level)
 
-		require.NotNil(t, cfg.RabbitMQ)
-		assert.Equal(t, "amqp://guest:guest@localhost:5672/", cfg.RabbitMQ.URI)
-
 		require.NotNil(t, cfg.Prometheus)
 		assert.True(t, cfg.Prometheus.GRPCMetrics)
 
@@ -178,7 +165,6 @@ func TestConfigStructure(t *testing.T) {
 
 		assert.Equal(t, "minimal-app", cfg.Name)
 		assert.Equal(t, "Minimal Application", cfg.Title)
-		assert.Nil(t, cfg.RabbitMQ)
 		assert.Nil(t, cfg.Prometheus)
 		assert.Nil(t, cfg.GRPC)
 		assert.Nil(t, cfg.HTTP)
