@@ -22,5 +22,12 @@
 	"grpc": {
 		"reflection": true,
 		"healthCheck": true
+	},
+	"http": {
+		"servers": {
+			"api": {
+				"port": 4747
+			}
+		}
 	}
 }

@@ -6,6 +6,7 @@ require (
 	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
 	github.com/47monad/apin/config v0.0.0
 	github.com/47monad/apin/initrs/grpcinitr v0.0.0
+	github.com/47monad/apin/initrs/httpinitr v0.0.0
 	github.com/47monad/apin/initrs/pginitr v0.0.0
 	github.com/47monad/apin/initrs/zapinitr v0.0.0
 )
@@ -51,6 +52,8 @@ replace github.com/47monad/apin => ../..
 replace github.com/47monad/apin/config => ../../config
 
 replace github.com/47monad/apin/initrs/grpcinitr => ../../initrs/grpcinitr
+
+replace github.com/47monad/apin/initrs/httpinitr => ../../initrs/httpinitr
 
 replace github.com/47monad/apin/initrs/pginitr => ../../initrs/pginitr
 

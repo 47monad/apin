@@ -6,6 +6,7 @@ use (
 	./examples/grpcsvc
 	./initrs/etcdinitr
 	./initrs/grpcinitr
+	./initrs/httpinitr
 	./initrs/mongoinitr
 	./initrs/pginitr
 	./initrs/prominitr

@@ -10,19 +10,27 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"sort"
 
 	"github.com/47monad/apin"
 	"github.com/47monad/apin/config"
 	"github.com/47monad/apin/initrs/grpcinitr"
+	"github.com/47monad/apin/initrs/httpinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
 )
 
 type serviceConfig struct {
-	Name     string           `json:"name" yaml:"name"`
-	Logging  zapinitr.Config  `json:"logging" yaml:"logging"`
-	Postgres *pginitr.Config  `json:"postgres" yaml:"postgres"`
-	GRPC     grpcinitr.Config `json:"grpc" yaml:"grpc"`
+	Name     string            `json:"name" yaml:"name"`
+	Logging  zapinitr.Config   `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config   `json:"postgres" yaml:"postgres"`
+	GRPC     grpcinitr.Config  `json:"grpc" yaml:"grpc"`
+	HTTP     serviceHTTPConfig `json:"http" yaml:"http"`
+}
+
+type serviceHTTPConfig struct {
+	Servers map[string]httpinitr.Config `json:"servers" yaml:"servers"`
 }
 
 const grpcPort = 50051
@@ -69,6 +77,36 @@ func main() {
 	}
 	app.Track(srvShell)
 
+	httpServerNames := make([]string, 0, len(cfg.HTTP.Servers))
+	for name := range cfg.HTTP.Servers {
+		httpServerNames = append(httpServerNames, name)
+	}
+	sort.Strings(httpServerNames)
+	httpRunnables := make([]apin.Runnable, 0, len(httpServerNames))
+	for _, name := range httpServerNames {
+		serverConfig := cfg.HTTP.Servers[name]
+		httpMux := http.NewServeMux()
+		httpMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+		httpShell, err := httpinitr.New(ctx,
+			httpinitr.WithConfig(&serverConfig),
+			httpinitr.WithHandler(httpMux),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		app.Track(httpShell)
+
+		httpListener, err := httpShell.Listen()
+		if err != nil {
+			log.Fatal(err)
+		}
+		httpRunnables = append(httpRunnables, func(ctx context.Context) error {
+			return httpShell.Serve(ctx, httpListener)
+		})
+	}
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		log.Fatal(err)
@@ -79,9 +117,11 @@ func main() {
 	// registered by the initr.
 
 	// Run until SIGINT/SIGTERM or failure; shells close in reverse order.
-	if err := app.Run(ctx, func(ctx context.Context) error {
-		return srvShell.Serve(ctx, lis)
-	}); err != nil {
+	runnables := []apin.Runnable{
+		func(ctx context.Context) error { return srvShell.Serve(ctx, lis) },
+	}
+	runnables = append(runnables, httpRunnables...)
+	if err := app.Run(ctx, runnables...); err != nil {
 		loggerShell.Logger.Error(err, "application failed")
 	}
 }
