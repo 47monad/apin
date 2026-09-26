@@ -177,6 +177,24 @@ func TestBuildLoadEnvFileError(t *testing.T) {
 	})
 }
 
+func TestBuildEnvironmentPrecedence(t *testing.T) {
+	clearEnv(t)
+	dir := t.TempDir()
+	configPath := dir + "/service.cue"
+	envPath := dir + "/service.env"
+	require.NoError(t, os.WriteFile(configPath, []byte(`service: {name: "precedence", host: "from-config"}`), 0o600))
+	require.NoError(t, os.WriteFile(envPath, []byte("HOST=from-file\n"), 0o600))
+
+	fileConfig, err := manifest.Build(configPath, envPath)
+	require.NoError(t, err)
+	assert.Equal(t, "from-file", fileConfig.Host)
+
+	t.Setenv("HOST", "from-process")
+	processConfig, err := manifest.Build(configPath, envPath)
+	require.NoError(t, err)
+	assert.Equal(t, "from-process", processConfig.Host)
+}
+
 func TestGRPCClientAddressDefault(t *testing.T) {
 	// Shield the fixture from client-address variables the developer's own
 	// environment may export, so the empty CUE default is what we observe.
