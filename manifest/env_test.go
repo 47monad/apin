@@ -101,46 +101,6 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "info", cfg.Logging.Level)
 	})
 
-	t.Run("load_nested_vars/ok", func(t *testing.T) {
-		t.Setenv("LOG_LEVEL", "debug")
-		t.Setenv("MONGODB_URI", "mongodb://localhost:27017")
-		t.Setenv("MONGODB_USERNAME", "testuser")
-		t.Setenv("MONGODB_PASSWORD", "testpass")
-		t.Setenv("MONGODB_DBNAME", "testdb")
-
-		cfg := &manifest.Config{
-			Name:    "test-app",
-			Title:   "Test App",
-			Version: "1.0.0",
-			Logging: manifest.LoggingConfig{},
-			Mongodb: &manifest.MongodbConfig{},
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-
-		assert.Equal(t, "debug", cfg.Logging.Level)
-		assert.Equal(t, "mongodb://localhost:27017", cfg.Mongodb.URI)
-		assert.Equal(t, "testuser", cfg.Mongodb.Username)
-		assert.Equal(t, "testpass", cfg.Mongodb.Password)
-		assert.Equal(t, "testdb", cfg.Mongodb.DBName)
-	})
-
-	// MONGODB_DB_NAME is the standardized name; the legacy MONGODB_DBNAME
-	// is covered by load_nested_vars/ok above.
-	t.Run("load_new_db_name_var/ok", func(t *testing.T) {
-		t.Setenv("MONGODB_DB_NAME", "testdb")
-
-		cfg := &manifest.Config{
-			Mongodb: &manifest.MongodbConfig{},
-		}
-
-		err := manifest.LoadEnvVars(cfg)
-		require.NoError(t, err)
-
-		assert.Equal(t, "testdb", cfg.Mongodb.DBName)
-	})
-
 	t.Run("load_numeric_vars/ok", func(t *testing.T) {
 		t.Setenv("MAIN_GRPC_PORT", "50051")
 		t.Setenv("MAIN_HTTP_PORT", "8080")
@@ -195,10 +155,6 @@ func TestLoadEnvVars(t *testing.T) {
 		t.Setenv("MODE", "release")
 		t.Setenv("HOST", "0.0.0.0")
 		t.Setenv("LOG_LEVEL", "info")
-		t.Setenv("MONGODB_URI", "mongodb://mongo:27017")
-		t.Setenv("MONGODB_USERNAME", "produser")
-		t.Setenv("MONGODB_PASSWORD", "prodpass")
-		t.Setenv("MONGODB_DBNAME", "proddb")
 		t.Setenv("RABBITMQ_URI", "amqp://guest:guest@rabbitmq:5672/")
 		t.Setenv("MAIN_GRPC_PORT", "5000")
 		t.Setenv("MAIN_HTTP_PORT", "8000")
@@ -208,7 +164,6 @@ func TestLoadEnvVars(t *testing.T) {
 			Title:    "Production App",
 			Version:  "1.0.0",
 			Logging:  manifest.LoggingConfig{},
-			Mongodb:  &manifest.MongodbConfig{},
 			RabbitMQ: &manifest.RabbitMQConfig{},
 			GRPC:     &manifest.GRPCConfig{Servers: map[string]manifest.GRPCServerConfig{"main": {}}},
 			HTTP:     &manifest.HTTPConfig{Servers: map[string]manifest.HTTPServerConfig{"main": {}}},
@@ -221,23 +176,16 @@ func TestLoadEnvVars(t *testing.T) {
 		assert.Equal(t, "release", cfg.Mode)
 		assert.Equal(t, "0.0.0.0", cfg.Host)
 		assert.Equal(t, "info", cfg.Logging.Level)
-		assert.Equal(t, "mongodb://mongo:27017", cfg.Mongodb.URI)
-		assert.Equal(t, "produser", cfg.Mongodb.Username)
-		assert.Equal(t, "prodpass", cfg.Mongodb.Password)
-		assert.Equal(t, "proddb", cfg.Mongodb.DBName)
 		assert.Equal(t, "amqp://guest:guest@rabbitmq:5672/", cfg.RabbitMQ.URI)
 		assert.Equal(t, 5000, cfg.GRPC.Servers["main"].Port)
 		assert.Equal(t, 8000, cfg.HTTP.Servers["main"].Port)
 	})
 
 	t.Run("nil_pointer_in_config/ok", func(t *testing.T) {
-		t.Setenv("MONGODB_URI", "mongodb://localhost:27017")
-
 		cfg := &manifest.Config{
 			Name:    "test-app",
 			Title:   "Test App",
 			Version: "1.0.0",
-			// Mongodb is nil
 		}
 
 		err := manifest.LoadEnvVars(cfg)

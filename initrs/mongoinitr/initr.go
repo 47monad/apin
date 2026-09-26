@@ -14,6 +14,8 @@ type Shell struct {
 	DB     *mongo.Database
 }
 
+const defaultPingTimeout = 10 * time.Second
+
 func MustNew(ctx context.Context, opts ...Option) *Shell {
 	shell, err := New(ctx, opts...)
 	if err != nil {
@@ -23,11 +25,8 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{
-		Opts:        options.Client(),
-		PingTimeout: 10 * time.Second,
-	}
-	if err := apply(store, opts); err != nil {
+	store, err := resolveStore(opts...)
+	if err != nil {
 		return nil, err
 	}
 
@@ -49,6 +48,23 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	}
 
 	return shell, nil
+}
+
+func resolveStore(opts ...Option) (*Store, error) {
+	store := &Store{
+		Opts:        options.Client(),
+		PingTimeout: defaultPingTimeout,
+	}
+	if err := apply(store, opts); err != nil {
+		return nil, err
+	}
+	if err := store.Opts.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid MongoDB configuration: %w", err)
+	}
+	if store.PingTimeout <= 0 {
+		return nil, fmt.Errorf("invalid MongoDB configuration: ping timeout must be positive")
+	}
+	return store, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {

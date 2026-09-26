@@ -3,9 +3,14 @@ package mongoinitr
 import (
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+// Config contains MongoDB connection settings owned by mongoinitr.
+type Config struct {
+	URI    string `json:"uri" yaml:"uri" env:"mongodb_uri"`
+	DBName string `json:"dbName" yaml:"dbName" env:"mongodb_db_name"`
+}
 
 // Store is the resolved configuration of a shell.
 type Store struct {
@@ -18,9 +23,9 @@ type Store struct {
 // to New, so later options win.
 type Option func(*Store) error
 
-// WithConfig applies a manifest config section. It is the entry point for
+// WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *manifest.MongodbConfig) Option {
+func WithConfig(config *Config) Option {
 	return func(s *Store) error {
 		if config == nil {
 			return nil

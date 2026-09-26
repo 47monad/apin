@@ -16,33 +16,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "debug", cfg.Level)
 	})
 
-	t.Run("MongodbOptions_struct", func(t *testing.T) {
-		options := manifest.MongodbOptions{
-			ReplicaSet: "rs0",
-		}
-		assert.Equal(t, "rs0", options.ReplicaSet)
-	})
-
-	t.Run("MongodbConfig_struct", func(t *testing.T) {
-		cfg := manifest.MongodbConfig{
-			URI:      "mongodb://localhost:27017",
-			Username: "user",
-			Password: "pass",
-			DBName:   "testdb",
-			Hosts:    []string{"localhost:27017", "localhost:27018"},
-			Options: manifest.MongodbOptions{
-				ReplicaSet: "rs0",
-			},
-		}
-
-		assert.Equal(t, "mongodb://localhost:27017", cfg.URI)
-		assert.Equal(t, "user", cfg.Username)
-		assert.Equal(t, "pass", cfg.Password)
-		assert.Equal(t, "testdb", cfg.DBName)
-		assert.Equal(t, []string{"localhost:27017", "localhost:27018"}, cfg.Hosts)
-		assert.Equal(t, "rs0", cfg.Options.ReplicaSet)
-	})
-
 	t.Run("RabbitMQConfig_struct", func(t *testing.T) {
 		cfg := manifest.RabbitMQConfig{
 			URI: "amqp://guest:guest@localhost:5672/",
@@ -136,16 +109,6 @@ func TestConfigStructure(t *testing.T) {
 			Logging: manifest.LoggingConfig{
 				Level: "debug",
 			},
-			Mongodb: &manifest.MongodbConfig{
-				URI:      "mongodb://localhost:27017",
-				Username: "user",
-				Password: "pass",
-				DBName:   "testdb",
-				Hosts:    []string{"localhost:27017"},
-				Options: manifest.MongodbOptions{
-					ReplicaSet: "rs0",
-				},
-			},
 			RabbitMQ: &manifest.RabbitMQConfig{
 				URI: "amqp://guest:guest@localhost:5672/",
 			},
@@ -186,10 +149,6 @@ func TestConfigStructure(t *testing.T) {
 		assert.Equal(t, "localhost", cfg.Host)
 		assert.Equal(t, "debug", cfg.Logging.Level)
 
-		require.NotNil(t, cfg.Mongodb)
-		assert.Equal(t, "mongodb://localhost:27017", cfg.Mongodb.URI)
-		assert.Equal(t, "user", cfg.Mongodb.Username)
-
 		require.NotNil(t, cfg.RabbitMQ)
 		assert.Equal(t, "amqp://guest:guest@localhost:5672/", cfg.RabbitMQ.URI)
 
@@ -219,7 +178,6 @@ func TestConfigStructure(t *testing.T) {
 
 		assert.Equal(t, "minimal-app", cfg.Name)
 		assert.Equal(t, "Minimal Application", cfg.Title)
-		assert.Nil(t, cfg.Mongodb)
 		assert.Nil(t, cfg.RabbitMQ)
 		assert.Nil(t, cfg.Prometheus)
 		assert.Nil(t, cfg.GRPC)

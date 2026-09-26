@@ -11,12 +11,22 @@ go get github.com/47monad/apin/initrs/mongoinitr
 ## Usage
 
 ```go
-// config-file driven
-dbShell, err := mongoinitr.New(ctx, mongoinitr.WithConfig(cfg.Mongodb))
+// Applications compose only the configuration they use.
+type serviceConfig struct {
+	Name  string             `json:"name" yaml:"name"`
+	Mongo *mongoinitr.Config `json:"mongo" yaml:"mongo"`
+}
+
+var cfg serviceConfig
+if err := config.Load("service.yaml", ".env", &cfg); err != nil {
+	return err
+}
+
+dbShell, err := mongoinitr.New(ctx, mongoinitr.WithConfig(cfg.Mongo))
 
 // config file + overrides
 dbShell, err := mongoinitr.New(ctx,
-	mongoinitr.WithConfig(cfg.Mongodb),
+	mongoinitr.WithConfig(cfg.Mongo),
 	mongoinitr.WithPingTimeout(3*time.Second),
 )
 
@@ -43,7 +53,7 @@ type Shell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.MongodbConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*mongoinitr.Config)` | apply initializer-owned configuration |
 | `WithURI(uri string)` | apply a mongodb connection URI (applies all URI options to the driver) |
 | `WithTimeout(d time.Duration)` | driver connect timeout |
 | `WithDBName(name string)` | default database of the returned shell |
@@ -51,8 +61,10 @@ type Shell struct {
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.MongodbConfig`: `URI` and `DBName`. Any of these can
-be overridden by a later option.
+`Config` is decoded by the application's loader, not by mongoinitr. `WithConfig`
+applies the URI and database name; later options override either value. The
+initializer validates the resolved driver options before attempting a
+connection. `PingTimeout` defaults to `10s`.
 
 ## Lifecycle
 

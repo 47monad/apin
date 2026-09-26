@@ -19,7 +19,6 @@ import (
   env: *"dev" | #Env
   mode: *"normal" | #Mode
   logging: log.config
-  mongodb?: db.mongodb
   etcd?: db.etcd
   rabbitmq?: broker.rabbitmq
   prometheus?: monitoring.prometheus

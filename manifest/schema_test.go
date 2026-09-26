@@ -81,7 +81,6 @@ func TestSchemaDefaults(t *testing.T) {
 	assert.Equal(t, "error", cfg.Logging.Level)
 
 	// Optional sections stay nil when the instance omits them.
-	assert.Nil(t, cfg.Mongodb)
 	assert.Nil(t, cfg.Etcd)
 	assert.Nil(t, cfg.RabbitMQ)
 	assert.Nil(t, cfg.Prometheus)

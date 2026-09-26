@@ -135,10 +135,9 @@ func TestNewDecodesInitrSections(t *testing.T) {
 	}
 	cfg := app.Config()
 	var (
-		_ *manifest.GRPCConfig    = cfg.GRPC
-		_ *manifest.HTTPConfig    = cfg.HTTP
-		_ *manifest.EtcdConfig    = cfg.Etcd
-		_ *manifest.MongodbConfig = cfg.Mongodb
+		_ *manifest.GRPCConfig = cfg.GRPC
+		_ *manifest.HTTPConfig = cfg.HTTP
+		_ *manifest.EtcdConfig = cfg.Etcd
 	)
 	if len(cfg.GRPC.Servers) == 0 {
 		t.Error("GRPC.Servers empty, want decoded section")
