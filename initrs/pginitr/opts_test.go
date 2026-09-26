@@ -1,86 +1,155 @@
-package pginitr
+package pginitr_test
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
+
+	"github.com/47monad/apin/initrs/pginitr"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestOptionPrecedenceAndComposition(t *testing.T) {
-	store, err := newStore([]Option{
-		WithConfig(&Config{
-			URI:      "postgres://fileuser:filepass@filehost:5433/filedb?sslmode=require",
-			Username: "user",
-			Password: "pass",
-			Host:     "host",
-			Port:     5432,
-			DBName:   "db",
+func TestOptionPrecedenceAndCompositionThroughNew(t *testing.T) {
+	stop := errors.New("stop before connect")
+	var captured *pgx.ConnConfig
+
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithConfig(&pginitr.Config{
+			URI:         "postgres://fileuser:filepass@filehost:5433/filedb?sslmode=require",
+			Username:    "user",
+			Password:    "pass",
+			Host:        "host",
+			Port:        5432,
+			DBName:      "db",
+			SSLMode:     "require",
+			AppName:     "apin",
+			ConnTimeout: 5,
 		}),
-		WithHost("override-host"),
-		WithPort(6543),
-		WithSSLMode("disable"),
-	})
-	if err != nil {
-		t.Fatalf("newStore() error = %v", err)
+		pginitr.WithHost("override-host"),
+		pginitr.WithPort(6543),
+		pginitr.WithSSLMode("disable"),
+		pginitr.WithSingleConn(),
+		pginitr.WithNativeConnConfig(func(config *pgx.ConnConfig) error {
+			captured = config.Copy()
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
 	}
-
-	want := "postgres://user:pass@override-host:6543/db?sslmode=disable"
-	if got := store.URI.String(); got != want {
-		t.Errorf("URI = %q, want %q", got, want)
+	if captured == nil {
+		t.Fatal("native config option was not called")
 	}
-}
-
-func TestPortOrderIndependence(t *testing.T) {
-	store, err := newStore([]Option{WithPort(5432), WithHost("localhost")})
-	if err != nil {
-		t.Fatalf("newStore() error = %v", err)
+	if captured.Host != "override-host" || captured.Port != 6543 || captured.Database != "db" {
+		t.Errorf("native target = %s:%d/%s, want override-host:6543/db", captured.Host, captured.Port, captured.Database)
 	}
-	if got, want := store.URI.Host, "localhost:5432"; got != want {
-		t.Errorf("URI.Host = %q, want %q", got, want)
+	if captured.User != "user" || captured.Password != "pass" {
+		t.Errorf("native credentials = %q/%q, want user/pass", captured.User, captured.Password)
 	}
-}
-
-func TestDefaults(t *testing.T) {
-	store, err := newStore([]Option{WithHost("localhost")})
-	if err != nil {
-		t.Fatalf("newStore() error = %v", err)
+	if captured.TLSConfig != nil {
+		t.Errorf("TLSConfig = %v, want nil for sslmode=disable", captured.TLSConfig)
 	}
-	if store.Mode != ModePool {
-		t.Errorf("Mode = %q, want default %q", store.Mode, ModePool)
+	if got := captured.RuntimeParams["application_name"]; got != "apin" {
+		t.Errorf("application_name = %q, want apin", got)
 	}
-	if got, want := store.URI.Scheme, "postgres"; got != want {
-		t.Errorf("URI.Scheme = %q, want %q", got, want)
+	if got, want := captured.ConnectTimeout, 5*time.Second; got != want {
+		t.Errorf("ConnectTimeout = %v, want %v", got, want)
 	}
 }
 
-func TestFullConfigMapping(t *testing.T) {
-	store, err := newStore([]Option{WithConfig(&Config{
-		Host:        "localhost",
-		Port:        5432,
-		Username:    "postgres",
-		Password:    "secret",
-		DBName:      "settings",
-		SSLMode:     "disable",
-		AppName:     "apin",
-		ConnTimeout: 5,
-		Mode:        "conn",
-		Pool: PoolConfig{
-			MaxConns:        10,
-			MinConns:        2,
-			MaxConnLifetime: 3600,
-			MaxConnIdleTime: 300,
-		},
-	})})
-	if err != nil {
-		t.Fatalf("newStore() error = %v", err)
-	}
+func TestPortOptionOrderIndependenceThroughNew(t *testing.T) {
+	stop := errors.New("stop before connect")
+	var captured *pgx.ConnConfig
 
-	want := "postgres://postgres:secret@localhost:5432/settings?application_name=apin&connect_timeout=5&sslmode=disable"
-	if got := store.URI.String(); got != want {
-		t.Errorf("URI = %q, want %q", got, want)
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithPort(5432),
+		pginitr.WithHost("localhost"),
+		pginitr.WithDBName("settings"),
+		pginitr.WithSingleConn(),
+		pginitr.WithNativeConnConfig(func(config *pgx.ConnConfig) error {
+			captured = config.Copy()
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
 	}
-	if store.Mode != ModeConn {
-		t.Errorf("Mode = %q, want %q", store.Mode, ModeConn)
+	if captured == nil || captured.Host != "localhost" || captured.Port != 5432 || captured.Database != "settings" {
+		t.Fatalf("native config = %+v, want localhost:5432/settings", captured)
 	}
-	if store.Pool.MaxConns != 10 || store.Pool.MinConns != 2 || store.Pool.MaxConnLifetime != 3600 || store.Pool.MaxConnIdleTime != 300 {
-		t.Errorf("Pool = %+v, want mapped pool config", store.Pool)
+}
+
+func TestPoolConfigAndNativePoolOptionThroughNew(t *testing.T) {
+	stop := errors.New("stop before connect")
+	var configuredMax int32
+	var configuredJitter time.Duration
+
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithConfig(&pginitr.Config{
+			Host: "localhost",
+			Pool: pginitr.PoolConfig{MaxConns: 10, MinConns: 2},
+		}),
+		pginitr.WithNativePoolConfig(func(config *pgxpool.Config) error {
+			configuredMax = config.MaxConns
+			config.MaxConnLifetimeJitter = 17 * time.Second
+			configuredJitter = config.MaxConnLifetimeJitter
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
+	}
+	if configuredMax != 10 {
+		t.Errorf("native pool MaxConns = %d, want 10", configuredMax)
+	}
+	if configuredJitter != 17*time.Second {
+		t.Errorf("native MaxConnLifetimeJitter = %v, want %v", configuredJitter, 17*time.Second)
+	}
+}
+
+func TestLaterConfigResetsEarlierPoolTuning(t *testing.T) {
+	stop := errors.New("stop before connect")
+	var defaults, got int32
+
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithHost("localhost"),
+		pginitr.WithNativePoolConfig(func(config *pgxpool.Config) error {
+			defaults = config.MaxConns
+			return nil
+		}),
+		pginitr.WithPoolConfig(pginitr.PoolConfig{MaxConns: 10}),
+		pginitr.WithConfig(&pginitr.Config{Host: "localhost"}),
+		pginitr.WithNativePoolConfig(func(config *pgxpool.Config) error {
+			got = config.MaxConns
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
+	}
+	if got != defaults {
+		t.Errorf("MaxConns after later empty config = %d, want pgx default %d", got, defaults)
+	}
+}
+
+func TestLaterModeOptionOverridesInvalidEarlierModeBeforeValidation(t *testing.T) {
+	stop := errors.New("stop before connect")
+	called := false
+
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithConfig(&pginitr.Config{Host: "localhost", Mode: "invalid"}),
+		pginitr.WithSingleConn(),
+		pginitr.WithNativeConnConfig(func(*pgx.ConnConfig) error {
+			called = true
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
+	}
+	if !called {
+		t.Error("final validation ran before all options were applied")
 	}
 }

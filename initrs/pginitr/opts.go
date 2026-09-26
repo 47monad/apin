@@ -1,9 +1,13 @@
 package pginitr
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Mode selects the connection strategy of the shell.
@@ -26,22 +30,37 @@ type PoolConfig struct {
 	HealthCheckInterval int `json:"healthCheckInterval,omitempty" yaml:"healthCheckInterval,omitempty" env:"postgres_pool_health_check_interval"`
 }
 
-// Store is the resolved configuration of a shell. Options are applied to it
-// in the order they are passed to New, so later options win.
-type Store struct {
-	URI  *url.URL
-	Port string // composed onto the URI host after all options are applied
-	Mode Mode
-	Pool PoolConfig
+// resolvedConfig is the private construction state. Options are applied in
+// order, so later options win.
+type resolvedConfig struct {
+	uri         *url.URL
+	port        string // composed onto the URI host after all options are applied
+	mode        Mode
+	pool        PoolConfig
+	poolOptions []poolConfigOption
+	connOptions []func(*pgx.ConnConfig) error
 }
 
-// Option mutates the store. Options returning an error fail New immediately.
-type Option func(*Store) error
+type poolConfigOption struct {
+	tuning    *PoolConfig
+	configure func(*pgxpool.Config) error
+}
+
+// Option is a sealed functional option accepted by New.
+type Option interface {
+	apply(*resolvedConfig) error
+}
+
+type optionFunc func(*resolvedConfig) error
+
+func (option optionFunc) apply(config *resolvedConfig) error {
+	return option(config)
+}
 
 // WithConfig applies an initializer-owned config; later options override
 // individual fields.
 func WithConfig(config *Config) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if config == nil {
 			return nil
 		}
@@ -64,13 +83,13 @@ func WithConfig(config *Config) Option {
 		}
 		opts = append(opts, WithPoolConfig(config.Pool))
 		return apply(s, opts)
-	}
+	})
 }
 
 // WithURI merges connection details from a postgres URI. Query params on the
 // URI are preserved unless overridden by later options.
 func WithURI(uri string) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if uri == "" {
 			return nil
 		}
@@ -79,20 +98,20 @@ func WithURI(uri string) Option {
 			return fmt.Errorf("failed to apply postgres URI: %w", err)
 		}
 		if parsed.User.Username() != "" {
-			s.URI.User = parsed.User
+			s.uri.User = parsed.User
 		}
 		if parsed.Path != "" {
-			s.URI.Path = parsed.Path
+			s.uri.Path = parsed.Path
 		}
 		if parsed.Host != "" {
-			s.URI.Host = parsed.Host
+			s.uri.Host = parsed.Host
 		}
 		if parsed.RawQuery != "" {
 			query, err := url.ParseQuery(parsed.RawQuery)
 			if err != nil {
 				return fmt.Errorf("failed to apply postgres URI: %w", err)
 			}
-			existing, err := url.ParseQuery(s.URI.RawQuery)
+			existing, err := url.ParseQuery(s.uri.RawQuery)
 			if err != nil {
 				return fmt.Errorf("failed to apply postgres URI: %w", err)
 			}
@@ -101,48 +120,48 @@ func WithURI(uri string) Option {
 					existing[key] = values
 				}
 			}
-			s.URI.RawQuery = existing.Encode()
+			s.uri.RawQuery = existing.Encode()
 		}
 		return nil
-	}
+	})
 }
 
 // WithUser sets explicit URL user info, taking precedence over URI-derived
 // credentials.
 func WithUser(user *url.Userinfo) Option {
-	return func(s *Store) error {
-		s.URI.User = user
+	return optionFunc(func(s *resolvedConfig) error {
+		s.uri.User = user
 		return nil
-	}
+	})
 }
 
 // WithHost sets the database host.
 func WithHost(host string) Option {
-	return func(s *Store) error {
-		s.URI.Host = host
+	return optionFunc(func(s *resolvedConfig) error {
+		s.uri.Host = host
 		return nil
-	}
+	})
 }
 
 // WithPort sets the database port. It composes with WithHost and URIs
 // regardless of option order.
 func WithPort(port int) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if port != 0 {
-			s.Port = strconv.Itoa(port)
+			s.port = strconv.Itoa(port)
 		}
 		return nil
-	}
+	})
 }
 
 // WithDBName sets the database name.
 func WithDBName(dbname string) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if dbname != "" {
-			s.URI.Path = dbname
+			s.uri.Path = dbname
 		}
 		return nil
-	}
+	})
 }
 
 // WithSSLMode sets the sslmode URI parameter.
@@ -153,31 +172,26 @@ func WithSSLMode(sslmode string) Option {
 // WithParam sets a single URI parameter, overriding same-named parameters
 // from earlier options.
 func WithParam(key, value string) Option {
-	return func(s *Store) error {
+	return optionFunc(func(s *resolvedConfig) error {
 		if value == "" {
 			return nil
 		}
-		query, err := url.ParseQuery(s.URI.RawQuery)
+		query, err := url.ParseQuery(s.uri.RawQuery)
 		if err != nil {
 			return fmt.Errorf("failed to parse postgres URI query: %w", err)
 		}
 		query.Set(key, value)
-		s.URI.RawQuery = query.Encode()
+		s.uri.RawQuery = query.Encode()
 		return nil
-	}
+	})
 }
 
 // WithMode sets the connection strategy explicitly.
 func WithMode(mode Mode) Option {
-	return func(s *Store) error {
-		switch mode {
-		case ModePool, ModeConn:
-			s.Mode = mode
-			return nil
-		default:
-			return fmt.Errorf("pginitr: invalid mode %q", mode)
-		}
-	}
+	return optionFunc(func(s *resolvedConfig) error {
+		s.mode = mode
+		return nil
+	})
 }
 
 // WithPool selects pool mode. Pool mode is the default.
@@ -192,20 +206,48 @@ func WithSingleConn() Option {
 
 // WithPoolConfig sets pool tuning. Only applied in pool mode.
 func WithPoolConfig(pool PoolConfig) Option {
-	return func(s *Store) error {
-		s.Pool = pool
+	return optionFunc(func(s *resolvedConfig) error {
+		s.pool = pool
+		poolCopy := pool
+		s.poolOptions = append(s.poolOptions, poolConfigOption{tuning: &poolCopy})
 		return nil
-	}
+	})
 }
 
-func apply(s *Store, opts []Option) error {
+// WithNativePoolConfig adds a deliberate escape hatch for pgxpool settings
+// not represented by pginitr.PoolConfig. It applies in pool mode.
+func WithNativePoolConfig(configure func(*pgxpool.Config) error) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		if configure != nil {
+			s.poolOptions = append(s.poolOptions, poolConfigOption{configure: configure})
+		}
+		return nil
+	})
+}
+
+// WithNativeConnConfig adds a deliberate escape hatch for pgx connection
+// settings not represented by pginitr.Config. It applies in either mode.
+func WithNativeConnConfig(configure func(*pgx.ConnConfig) error) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		if configure != nil {
+			s.connOptions = append(s.connOptions, configure)
+			s.poolOptions = append(s.poolOptions, poolConfigOption{configure: func(config *pgxpool.Config) error {
+				return configure(config.ConnConfig)
+			}})
+		}
+		return nil
+	})
+}
+
+func apply(s *resolvedConfig, opts []Option) error {
+	var errs []error
 	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-		if err := opt(s); err != nil {
-			return err
+		if err := opt.apply(s); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }

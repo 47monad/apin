@@ -82,6 +82,8 @@ automatic reconnection — the pool is the default for a reason.
 | `WithPool()` | sugar for `WithMode(ModePool)` |
 | `WithSingleConn()` | sugar for `WithMode(ModeConn)` |
 | `WithPoolConfig(PoolConfig)` | pool tuning; only applied in pool mode |
+| `WithNativePoolConfig(func(*pgxpool.Config) error)` | configure native pool features not represented by `PoolConfig` |
+| `WithNativeConnConfig(func(*pgx.ConnConfig) error)` | configure native connection features not represented by `Config` |
 
 `PoolConfig` fields (seconds for the time values, zero leaves pgxpool defaults):
 
@@ -102,6 +104,10 @@ type PoolConfig struct {
 `AppName` → `application_name`, `ConnTimeout` → `connect_timeout`, `Mode`
 (`"pool"`/`"conn"`), and the `Pool` block. Any of these can be overridden by
 a later option.
+
+Options are sealed: callers can combine the named options but cannot mutate
+pginitr's private construction state. Native pgx callbacks are the deliberate
+escape hatch for driver settings not modeled by pginitr.
 
 ## Lifecycle
 

@@ -63,24 +63,24 @@ func (c *Config) DSN() (string, error) {
 	return u.String(), nil
 }
 
-func validateStore(store *Store) error {
+func validateConfig(config *resolvedConfig) error {
 	var errs []error
-	if store.Mode != ModePool && store.Mode != ModeConn {
-		errs = append(errs, fmt.Errorf("postgres: invalid mode %q (want %q or %q)", store.Mode, ModePool, ModeConn))
+	if config.mode != ModePool && config.mode != ModeConn {
+		errs = append(errs, fmt.Errorf("postgres: invalid mode %q (want %q or %q)", config.mode, ModePool, ModeConn))
 	}
-	if store.Port != "" {
-		port, err := strconv.Atoi(store.Port)
+	if config.port != "" {
+		port, err := strconv.Atoi(config.port)
 		if err != nil || port < 1 || port > 65535 {
-			errs = append(errs, fmt.Errorf("postgres: port %q out of range (1-65535)", store.Port))
+			errs = append(errs, fmt.Errorf("postgres: port %q out of range (1-65535)", config.port))
 		}
 	}
-	if uriPort := store.URI.Port(); uriPort != "" {
+	if uriPort := config.uri.Port(); uriPort != "" {
 		port, err := strconv.Atoi(uriPort)
 		if err != nil || port < 1 || port > 65535 {
 			errs = append(errs, fmt.Errorf("postgres: URI port %q out of range (1-65535)", uriPort))
 		}
 	}
-	query, err := url.ParseQuery(store.URI.RawQuery)
+	query, err := url.ParseQuery(config.uri.RawQuery)
 	if err != nil {
 		return errors.Join(append(errs, fmt.Errorf("postgres: invalid connection query: %w", err))...)
 	}
@@ -93,22 +93,22 @@ func validateStore(store *Store) error {
 			errs = append(errs, errors.New("postgres: connTimeout must not be negative or invalid"))
 		}
 	}
-	if store.Pool.MinConns < 0 {
+	if config.pool.MinConns < 0 {
 		errs = append(errs, errors.New("postgres: pool.minConns must not be negative"))
 	}
-	if store.Pool.MaxConns < 0 {
+	if config.pool.MaxConns < 0 {
 		errs = append(errs, errors.New("postgres: pool.maxConns must not be negative"))
 	}
-	if store.Pool.MaxConns > 0 && store.Pool.MinConns > store.Pool.MaxConns {
-		errs = append(errs, fmt.Errorf("postgres: pool.minConns (%d) must not exceed pool.maxConns (%d)", store.Pool.MinConns, store.Pool.MaxConns))
+	if config.pool.MaxConns > 0 && config.pool.MinConns > config.pool.MaxConns {
+		errs = append(errs, fmt.Errorf("postgres: pool.minConns (%d) must not exceed pool.maxConns (%d)", config.pool.MinConns, config.pool.MaxConns))
 	}
 	for _, field := range []struct {
 		name    string
 		seconds int
 	}{
-		{name: "maxConnLifetime", seconds: store.Pool.MaxConnLifetime},
-		{name: "maxConnIdleTime", seconds: store.Pool.MaxConnIdleTime},
-		{name: "healthCheckInterval", seconds: store.Pool.HealthCheckInterval},
+		{name: "maxConnLifetime", seconds: config.pool.MaxConnLifetime},
+		{name: "maxConnIdleTime", seconds: config.pool.MaxConnIdleTime},
+		{name: "healthCheckInterval", seconds: config.pool.HealthCheckInterval},
 	} {
 		if field.seconds < 0 {
 			errs = append(errs, fmt.Errorf("postgres: pool.%s must not be negative", field.name))
