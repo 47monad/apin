@@ -2,14 +2,14 @@ package pginitr_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/47monad/apin/initrs/pginitr"
-	"github.com/47monad/apin/manifest"
 )
 
-func config() *manifest.PostgresConfig {
-	return &manifest.PostgresConfig{
+func config() *pginitr.Config {
+	return &pginitr.Config{
 		Host:     "localhost",
 		Port:     5432,
 		Username: "postgres",
@@ -114,5 +114,23 @@ func TestShellDBNotInitialized(t *testing.T) {
 	shell := &pginitr.Shell{}
 	if _, err := shell.DB(); err == nil {
 		t.Fatal("DB() error = nil on uninitialized shell, want error")
+	}
+}
+
+func TestPingHonorsCanceledContext(t *testing.T) {
+	shell, err := pginitr.New(context.Background(),
+		pginitr.WithHost("127.0.0.1"),
+		pginitr.WithPort(1),
+		pginitr.WithDBName("apin_test"),
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer shell.Close(context.Background())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := shell.Ping(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Ping() error = %v, want context.Canceled", err)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 )
@@ -22,15 +21,8 @@ const defaultShutdownTimeout = 30 * time.Second
 type App struct {
 	logger          logr.Logger
 	shutdownTimeout time.Duration
-	config          *manifest.Config
-
-	// configPath and envPath are recorded by the WithConfig/WithEnv options
-	// and consumed once after all options are applied.
-	configPath string
-	envPath    string
-
-	mu      sync.Mutex
-	closers []Closer
+	mu              sync.Mutex
+	closers         []Closer
 }
 
 // AppOption configures an App.
@@ -50,7 +42,8 @@ func WithShutdownTimeout(timeout time.Duration) AppOption {
 	}
 }
 
-func NewApp(opts ...AppOption) *App {
+// New creates an App and applies the supplied lifecycle options.
+func New(opts ...AppOption) *App {
 	app := &App{
 		logger:          logr.Discard(),
 		shutdownTimeout: defaultShutdownTimeout,
@@ -77,13 +70,19 @@ func (app *App) Track(shells ...Closer) *App {
 	return app
 }
 
-// Logger returns the app logger, handy for runners that take a logr.Logger.
+// Logger returns the app's lifecycle logger.
 func (app *App) Logger() logr.Logger {
 	return app.logger
 }
 
+// SetLogger installs a logger for lifecycle events. It overrides any logger
+// set during construction.
+func (app *App) SetLogger(logger logr.Logger) {
+	app.logger = logger
+}
+
 // SetShutdownTimeout bounds the shutdown phase performed by Run. It is the
-// post-construction counterpart of the WithShutdownTimeout NewApp option, for
+// post-construction counterpart of the WithShutdownTimeout New option, for
 // apps built with New. Non-positive values restore the 30s default.
 func (app *App) SetShutdownTimeout(timeout time.Duration) *App {
 	if timeout <= 0 {
@@ -136,13 +135,13 @@ func (app *App) Run(ctx context.Context, runnables ...Runnable) error {
 		runErr = nil
 	}
 
-	// A second signal during shutdown exits immediately.
+	// A second signal during shutdown cancels cleanup more aggressively.
 	stop := make(chan struct{})
 	defer close(stop)
-	app.watchForceExit(stop)
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
 	defer cancel()
+	app.watchForceCancel(stop, cancel)
 	closeErr := app.Close(closeCtx)
 
 	return errors.Join(runErr, closeErr)
@@ -185,9 +184,9 @@ func (app *App) waitSignal(ctx context.Context) error {
 	}
 }
 
-// watchForceExit exits immediately on a second signal, before the watchdog
-// channel is closed.
-func (app *App) watchForceExit(stop chan struct{}) {
+// watchForceCancel cancels cleanup on a second signal, leaving process
+// termination to the application.
+func (app *App) watchForceCancel(stop <-chan struct{}, cancel context.CancelFunc) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -196,8 +195,8 @@ func (app *App) watchForceExit(stop chan struct{}) {
 		select {
 		case <-stop:
 		case sig := <-sigCh:
-			app.logger.Info("forced exit on second signal", "signal", sig.String())
-			os.Exit(1)
+			app.logger.Info("shutdown cleanup cancelled by second signal", "signal", sig.String())
+			cancel()
 		}
 	}()
 }

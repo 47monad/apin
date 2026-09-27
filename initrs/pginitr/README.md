@@ -1,6 +1,6 @@
 # pginitr
 
-PostgreSQL initr. Returns a ready-to-use shell holding either a
+PostgreSQL initr. Returns a shell holding either a
 [`pgxpool.Pool`](https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool) (default)
 or a single `*pgx.Conn`, selected by mode.
 
@@ -11,7 +11,18 @@ go get github.com/47monad/apin/initrs/pginitr
 ## Usage
 
 ```go
-// config-file driven
+import "github.com/47monad/apin/config"
+
+// The application owns the aggregate; pginitr owns its PostgreSQL section.
+type serviceConfig struct {
+	Name     string          `json:"name" yaml:"name"`
+	Postgres *pginitr.Config `json:"postgres" yaml:"postgres"`
+}
+
+var cfg serviceConfig
+if err := config.Load("config.json", ".env", &cfg); err != nil {
+	panic(err)
+}
 dbShell, err := pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres))
 
 // config file + per-field overrides (later options win)
@@ -30,9 +41,13 @@ dbShell, err := pginitr.New(ctx,
 )
 ```
 
-`New` connects eagerly and fails fast — a returned shell is ready to use.
-Calling `New` with no configuration at all returns an error pointing at
-`WithConfig`/`WithURI`/connection options.
+In pool mode, `New` validates the configuration and constructs the pool
+without verifying database reachability; pool connections are lazy. In
+single-connection mode, `New` opens a connection eagerly. Call
+`dbShell.Ping(ctx)` to verify connectivity in either mode; give it a
+deadline-bearing context to bound the probe. Calling `New` with no
+configuration at all returns an error pointing at `WithConfig`/`WithURI`/
+connection options.
 
 ## Shell
 
@@ -43,6 +58,9 @@ type Shell struct {
 	Conn *pgx.Conn       // set when Mode == ModeConn
 }
 ```
+
+`Ping(ctx)` verifies connectivity through the active pool or single
+connection. It returns an error for an uninitialized shell.
 
 Exactly one of `Pool` / `Conn` is non-nil. For mode-independent queries:
 
@@ -59,7 +77,7 @@ automatic reconnection — the pool is the default for a reason.
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.PostgresConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*pginitr.Config)` | apply initializer-owned PostgreSQL configuration |
 | `WithURI(uri string)` | merge connection details from a postgres URI; query params preserved unless overridden later |
 | `WithUser(*url.Userinfo)` | explicit credentials; takes precedence over URI-derived ones |
 | `WithHost(host string)` | database host |
@@ -71,6 +89,8 @@ automatic reconnection — the pool is the default for a reason.
 | `WithPool()` | sugar for `WithMode(ModePool)` |
 | `WithSingleConn()` | sugar for `WithMode(ModeConn)` |
 | `WithPoolConfig(PoolConfig)` | pool tuning; only applied in pool mode |
+| `WithNativePoolConfig(func(*pgxpool.Config) error)` | configure native pool features not represented by `PoolConfig` |
+| `WithNativeConnConfig(func(*pgx.ConnConfig) error)` | configure native connection features not represented by `Config` |
 
 `PoolConfig` fields (seconds for the time values, zero leaves pgxpool defaults):
 
@@ -86,13 +106,20 @@ type PoolConfig struct {
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.PostgresConfig` field by field: `URI`, `Host`,
+`WithConfig` maps `*pginitr.Config` field by field: `URI`, `Host`,
 `Port` (int), `Username`/`Password`, `DBName`, `SSLMode` → `sslmode`,
 `AppName` → `application_name`, `ConnTimeout` → `connect_timeout`, `Mode`
 (`"pool"`/`"conn"`), and the `Pool` block. Any of these can be overridden by
 a later option.
 
+Options are sealed: callers can combine the named options but cannot mutate
+pginitr's private construction state. Native pgx callbacks are the deliberate
+escape hatch for driver settings not modeled by pginitr.
+
 ## Lifecycle
 
-`Close(ctx)` closes the single connection (with error) or the pool.
+`Close(ctx)` closes the single connection (with error) or starts closing the
+pool. pgx's pool close has no context-aware API, so if the supplied context
+expires while checked-out connections are still active, `Close` returns the
+context error and the pool continues draining in the background.
 Implementing `apin.Closer`, it slots directly into `apin.App.Track`.

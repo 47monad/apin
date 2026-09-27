@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// ParsePostgresURI parses a PostgreSQL connection URI and returns a PostgresConfig struct
+// ParseURI parses a PostgreSQL connection URI.
 func ParseURI(uri string) (*url.URL, error) {
 	u, err := url.Parse(uri)
 	if err != nil {

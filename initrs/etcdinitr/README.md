@@ -1,6 +1,6 @@
 # etcdinitr
 
-etcd initr. Returns a ready-to-use shell holding an etcd
+etcd initr. Returns a shell holding an etcd
 [`clientv3.Client`](https://pkg.go.dev/go.etcd.io/etcd/client/v3#Client).
 
 ```bash
@@ -10,8 +10,26 @@ go get github.com/47monad/apin/initrs/etcdinitr
 ## Usage
 
 ```go
-// config-file driven
+// Applications compose only the configuration they use.
+type serviceConfig struct {
+	Name string            `json:"name" yaml:"name"`
+	Etcd *etcdinitr.Config `json:"etcd" yaml:"etcd"`
+}
+
+var cfg serviceConfig
+if err := config.Load("service.yaml", ".env", &cfg); err != nil {
+	return err
+}
+
 etcdShell, err := etcdinitr.New(ctx, etcdinitr.WithConfig(cfg.Etcd))
+if err != nil {
+	return err
+}
+readyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+if err := etcdShell.Ready(readyCtx); err != nil {
+	return err
+}
 
 // config file + overrides
 etcdShell, err := etcdinitr.New(ctx,
@@ -27,8 +45,10 @@ etcdShell, err := etcdinitr.New(ctx,
 )
 ```
 
-`New` connects eagerly and fails fast on dial errors — a returned shell is
-ready to use.
+`New` validates the configuration and constructs the native client without
+verifying endpoint connectivity. Call `Ready(ctx)` to check whether any
+configured endpoint responds to an etcd status request. Pass a
+deadline-bearing context to bound the check.
 
 ## Shell
 
@@ -38,21 +58,32 @@ type Shell struct {
 }
 ```
 
+`Ready(ctx)` returns nil when any configured endpoint responds; otherwise it
+returns an error containing the endpoint failures. An uninitialized shell
+returns an error.
+
 ## Options
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.EtcdConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*etcdinitr.Config)` | apply initializer-owned configuration |
 | `WithEndpoints(endpoints []string)` | etcd endpoints |
 | `WithUsername(username string)` | auth username |
 | `WithPassword(password string)` | auth password |
 | `WithTimeout(d time.Duration)` | dial timeout |
+| `WithNativeConfig(func(*clientv3.Config) error)` | configure native etcd client settings not represented by the named options |
 
 ## Config mapping
 
-`WithConfig` maps `*manifest.EtcdConfig`: comma-separated `Endpoints`,
-`Username`, `Password`, and `Timeout` (seconds). Any of these can be
-overridden by a later option.
+`Config` is decoded by the application's loader, not by etcdinitr. `Endpoints`
+remains comma-separated and `Timeout` is an optional positive number of
+seconds. An omitted timeout leaves the native client's timeout unset, while an
+explicit zero or negative timeout is rejected. Later options override
+individual configured values.
+
+Options are sealed: callers can compose the named options but cannot mutate
+etcdinitr's private construction state. Native client configuration is the
+deliberate driver escape hatch.
 
 ## Lifecycle
 

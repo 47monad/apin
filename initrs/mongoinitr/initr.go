@@ -14,6 +14,8 @@ type Shell struct {
 	DB     *mongo.Database
 }
 
+const defaultPingTimeout = 10 * time.Second
+
 func MustNew(ctx context.Context, opts ...Option) *Shell {
 	shell, err := New(ctx, opts...)
 	if err != nil {
@@ -23,20 +25,17 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store := &Store{
-		Opts:        options.Client(),
-		PingTimeout: 10 * time.Second,
-	}
-	if err := apply(store, opts); err != nil {
+	store, err := resolveConfig(opts...)
+	if err != nil {
 		return nil, err
 	}
 
-	client, err := mongo.Connect(store.Opts)
+	client, err := mongo.Connect(store.clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, store.PingTimeout)
+	pingCtx, cancel := context.WithTimeout(ctx, store.pingTimeout)
 	defer cancel()
 
 	if err = client.Ping(pingCtx, nil); err != nil {
@@ -44,11 +43,28 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	}
 
 	shell := &Shell{Client: client}
-	if store.DBName != "" {
-		shell.DB = client.Database(store.DBName)
+	if store.dbName != "" {
+		shell.DB = client.Database(store.dbName)
 	}
 
 	return shell, nil
+}
+
+func resolveConfig(opts ...Option) (*resolvedConfig, error) {
+	store := &resolvedConfig{
+		clientOptions: options.Client(),
+		pingTimeout:   defaultPingTimeout,
+	}
+	if err := apply(store, opts); err != nil {
+		return nil, err
+	}
+	if err := store.clientOptions.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid MongoDB configuration: %w", err)
+	}
+	if store.pingTimeout <= 0 {
+		return nil, fmt.Errorf("invalid MongoDB configuration: ping timeout must be positive")
+	}
+	return store, nil
 }
 
 func (shell *Shell) Close(ctx context.Context) error {

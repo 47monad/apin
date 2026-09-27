@@ -8,11 +8,9 @@
 
 ## Overview
 
-Apin provides a uniform way to bootstrap the infrastructure services a
-microservice needs. Each service (`pginitr`, `mongoinitr`, `rmqinitr`, ...)
-is a separate Go module that turns a config section from the
-[service manifest](#configuration) into a ready-to-use **Shell** — with
-functional options for programmatic overrides.
+Apin provides shells for infrastructure services. Each initializer is a
+separate Go module with functional options; applications select the
+initializers they need and own any aggregate configuration type.
 
 You install only the initrs your service actually needs:
 
@@ -35,31 +33,42 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/47monad/apin"
+	"github.com/47monad/apin/config"
 	"github.com/47monad/apin/initrs/grpcinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
 )
 
+type serviceConfig struct {
+	Name     string                 `json:"name" yaml:"name"`
+	Logging  zapinitr.Config        `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
+	GRPC     *grpcConfig            `json:"grpc" yaml:"grpc"`
+}
+
+type grpcConfig struct {
+	Servers map[string]grpcServerConfig `json:"servers" yaml:"servers"`
+}
+
+type grpcServerConfig struct {
+	Port     int               `json:"port" yaml:"port"`
+	Features grpcinitr.Config `json:"features" yaml:"features"`
+}
+
 func main() {
 	ctx := context.Background()
 
-	// apin parses the config file; the .env file is optional.
-	app, err := apin.New(
-		apin.WithConfig("config.json"),
-		apin.WithEnv(".env"),
-	)
-	if err != nil {
+	var cfg serviceConfig
+	if err := config.Load("config.json", "", &cfg); err != nil {
 		log.Fatal(err)
 	}
-	cfg := app.Config()
-
-	// The logger initr needs the config, and the config is loaded by
-	// apin.New — so the app logger is registered after construction.
+	// The logger shell provides the App's lifecycle logger.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.RegisterLogger(loggerShell)
+	app := apin.New(apin.WithLogger(loggerShell.Logger))
+	app.Track(loggerShell)
 
 	dbShell, err := pginitr.New(ctx,
 		pginitr.WithConfig(cfg.Postgres), // config file values...
@@ -72,7 +81,7 @@ func main() {
 
 	grpcCfg := cfg.GRPC.Servers["api"]
 	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&grpcCfg),
+		grpcinitr.WithConfig(&grpcCfg.Features),
 		grpcinitr.WithRunnable(func(s *grpc.Server) {
 			pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 		}),
@@ -95,30 +104,36 @@ func main() {
 }
 ```
 
-A returned shell is ready to use (connections are verified at `New`), and
-`app.Run` blocks until a runnable fails, the context is cancelled, or
-SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
-order.
+A returned shell provides access to its native client. Connectivity is
+initializer-specific: PostgreSQL pool mode and etcd clients are constructed
+lazily, while PostgreSQL single-connection mode connects during `New`. Call
+`pginitr.Shell.Ping` or `etcdinitr.Shell.Ready` with a deadline-bearing
+context when startup must verify reachability. `app.Run` blocks until a
+runnable fails, the context is cancelled, or SIGINT/SIGTERM — then closes
+every tracked shell in reverse initialization order.
 
 A complete runnable version of this lives in
-[`examples/grpcsvc`](examples/grpcsvc) — including the `config.json` that
-`apin.WithConfig` reads.
+[`examples/grpcsvc`](examples/grpcsvc), including its application-owned
+aggregate configuration.
 
 ## The Shell Law
 
 Every initr follows the same contract, so any service reads the same way:
 
-1. **Shells.** Each initr returns a `Shell` — the ready-to-use handle for its
+1. **Shells.** Each initr returns a `Shell` — the initialized handle for its
    service (e.g. `pginitr.Shell`, `rmqinitr.Shell`). Cross-cutting shells
-   (logging) return `apin.LoggerShell`, so consumers are logger-agnostic.
+   (logging) return an initializer-owned shell exposing `logr.Logger`.
 2. **Construction.** `New(ctx, opts ...Option)` and `MustNew(ctx, opts...)`.
-   `New` connects eagerly and fails fast on missing configuration or dial
-   errors.
+   `New` validates configuration and constructs the native client; connection
+   verification is initializer-specific. PostgreSQL pool mode and etcd use
+   lazy client construction; PostgreSQL single-connection mode connects
+   eagerly. PostgreSQL exposes `Ping(ctx)` and etcd exposes `Ready(ctx)` for
+   explicit connectivity checks.
 3. **Options.** Functional options (`Option func(*Store) error`) are applied
    in order; later options win.
-4. **Config entry point.** `WithConfig(*manifest.XConfig)` is the config-file
-   path (the section types come from `app.Config()`). Individual `With*`
-   options override single fields on top of it:
+4. **Config entry point.** Each initializer can accept its own configuration
+	type. Applications choose the fields they need and individual `With*`
+	options override single fields:
    ```go
    pginitr.New(ctx, pginitr.WithConfig(cfg.Postgres), pginitr.WithPort(6543))
    ```
@@ -131,7 +146,7 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Form | Meaning |
 |---|---|
-| `WithConfig(cfg)` | apply a manifest config section |
+| `WithConfig(cfg)` | apply initializer configuration |
 | `With*` | set a scalar / toggle / composite |
 | `Add*` | append to a list |
 
@@ -139,24 +154,21 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Module | Shell | Notes |
 |---|---|---|
-| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | pool (default) or single connection; `DB()` gives a mode-independent query surface |
+| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | lazy connectivity; `Ping(ctx)` verifies the active pool or connection; `DB()` gives a mode-independent query surface |
 | [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection |
-| [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | |
+| [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
-| [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health check + reflection toggles; ctx-aware `Serve` |
-| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry}` | |
-| [`initrs/zapinitr`](initrs/zapinitr) | `apin.LoggerShell` | any logger initr returns the same shell |
+| [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
+| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
+| [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
 
 ## Graceful Shutdown
 
 `apin.App` owns the shutdown:
 
 ```go
-app, err := apin.New(apin.WithConfig("config.json"))
-if err != nil {
-	log.Fatal(err)
-}
-app.RegisterLogger(loggerShell)
+app := apin.New(apin.WithLogger(loggerShell.Logger))
+app.Track(loggerShell)
 defer app.Close(context.Background()) // manual lifecycle control
 ```
 
@@ -164,69 +176,60 @@ defer app.Close(context.Background()) // manual lifecycle control
 - `app.Run(ctx, runnables...)` — start serving; on SIGINT/SIGTERM or context
   cancellation, runnables are cancelled and shells closed in reverse order,
   bounded by a shutdown timeout (default 30s, `app.SetShutdownTimeout` to tune)
-- A second signal forces an immediate exit
+- A second signal cancels cleanup more aggressively; process termination
+  remains the application's decision.
 
 `app.Close(ctx)` alone closes tracked shells in reverse order — useful for
 tests or custom lifecycles.
 
-The `runner` package still works on its own for concurrent multi-server
-setups (`runner.AddGRPCServer`, `AddHTTPServer`, `AddHealthCheck`) — pass
-`runner.Run` as the App's runnable, handing it the App's context so the App's
-signal handling drives the runner's graceful shutdown, or use
-`ServerShell.Serve` for the single-server case shown above. Servers
-registered with the runner are drained by `runner.Stop`: in-flight requests
-and RPCs finish before the listener closes, and the SIGINT/SIGTERM wiring is
-documented in the package doc.
+Use each initializer shell to serve and stop its native resource. The App
+cancels runnables on shutdown, then closes tracked shells in reverse order
+with the same shutdown context and deadline. For example, `httpinitr` owns
+HTTP server shutdown and `grpcinitr` owns gRPC graceful-stop behavior; neither
+initializer installs process signal handlers.
 
 ## Configuration
 
-The service manifest is a CUE-validated, env-overridable config loaded by
-`apin.New` and read back with `app.Config()` — its sections (postgres, grpc,
-http, ...) feed straight into initr `WithConfig` calls. Programmatic `With*`
-options compose with it, field by field:
+The `github.com/47monad/apin/config` package loads JSON or YAML into an application-owned
+aggregate. PostgreSQL configuration belongs to `pginitr.Config`; the
+application includes only the initializer types it selects:
 
 ```go
-app, err := apin.New(
-	apin.WithConfig("config.json"), // CUE/JSON manifest
-	apin.WithEnv(".env"),           // optional; overrides manifest values
-)
-if err != nil {
+type serviceConfig struct {
+	Name     string          `json:"name" yaml:"name"`
+	Postgres *pginitr.Config `json:"postgres" yaml:"postgres"`
+}
+
+var cfg serviceConfig
+if err := config.Load("config.json", ".env", &cfg); err != nil {
 	log.Fatal(err)
 }
-cfg := app.Config() // nil when apin.New was called without WithConfig
 
 pginitr.New(ctx,
-	pginitr.WithConfig(cfg.Postgres), // from the config file
+	pginitr.WithConfig(cfg.Postgres),
 	pginitr.WithMode(pginitr.ModeConn), // override: single connection
 	pginitr.WithDBName("settings"),
 )
 ```
 
-Values from a `.env` file are parsed into an isolated set, never written to
-the process environment, so concurrent `apin.New` calls cannot interfere with
-each other. Precedence runs process environment > `.env` file > manifest, so
-an exported variable always beats a file entry.
+The loader reads `.env` values without changing the process environment.
+Precedence is process environment > `.env` file > configuration file.
 
-Initrs can also be configured without any config file, using options only. A
-program that wants the manifest without an `App` can call
-`apin.LoadConfig(configPath, envPath)` (or `MustLoadConfig`) directly.
+An initializer can also be configured entirely through options.
 
 ## Repository Layout
 
-- `common.go`, `app.go`, `bootstrap.go`, `config.go` — apin core (`LoggerShell`,
-  `Closer`, `App`, `apin.New` and config loading)
-- `manifest/` — the service manifest: CUE schema, section structs, env
-  overlay, and the `LoadConfig` machinery (inlined from the former zaal repo)
+- `common.go`, `app.go` — minimal lifecycle module (`App`, `Closer`, `Runnable`)
+- `config/` — JSON/YAML loading and environment overlays, shipped with the root `apin` module
 - `closr/` — the `Closer` alias, kept for compatibility
-- `runner/` — errgroup-based concurrent runner with graceful server shutdown
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
 
 ## Contributing
 
 When adding an initr, follow the [Shell Law](#the-shell-law): a `Shell` type,
-`New`/`MustNew` with variadic options, `WithConfig` mapping its manifest
-section, defaults and fail-fast validation inside `New`, and a
+`New`/`MustNew` with variadic options, initializer-owned configuration,
+defaults and fail-fast validation inside `New`, and a
 `Close(ctx) error`. Add the module to `go.work`.
 
 ## License

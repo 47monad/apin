@@ -11,31 +11,41 @@ go get github.com/47monad/apin/initrs/grpcinitr
 ## Usage
 
 ```go
-// config-file driven
-srvShell, err := grpcinitr.New(ctx, grpcinitr.WithConfig(&grpcCfg))
+// app-owned config; the initializer owns only server features
+srvShell, err := grpcinitr.New(ctx, grpcinitr.WithConfig(&grpcinitr.Config{
+	Reflection: true,
+	HealthCheck: true,
+}))
 
 // config file + service registration + interceptors
 srvShell, err := grpcinitr.New(ctx,
-	grpcinitr.WithConfig(&grpcCfg),
+	grpcinitr.WithConfig(&grpcCfg.Features),
 	grpcinitr.WithRunnable(func(s *grpc.Server) {
 		pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 	}),
 	grpcinitr.WithInterceptor(authInterceptor),
+	grpcinitr.WithServerOptions(grpc.MaxRecvMsgSize(4<<20)),
 )
 ```
 
 ## Serving
 
-`Serve` is context-aware and directly usable as an `apin.App` runnable —
-serving stops gracefully when the app shuts down:
+`Serve` is context-aware and directly usable as an `apin.App` runnable. When
+the app cancels runnable contexts, `Serve` returns; App then closes tracked
+shells with its single shutdown deadline, and the shell gracefully stops its
+native gRPC server:
 
 ```go
 lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
 
 app.Run(ctx, func(ctx context.Context) error {
-	return srvShell.Serve(ctx, lis) // graceful stop on app shutdown
+	return srvShell.Serve(ctx, lis)
 })
 ```
+
+When the standard health service is enabled, `RunHealthCheck(ctx, service,
+interval, checker)` periodically updates its status and returns when `ctx` is
+cancelled. The checker should honor its context.
 
 ## Shell
 
@@ -50,25 +60,29 @@ type ServerShell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*manifest.GRPCServerConfig)` | apply a manifest config section (entry point for config-file setups) |
+| `WithConfig(*grpcinitr.Config)` | apply initializer-owned feature settings |
 | `WithReflection(enabled bool)` | register the gRPC reflection service |
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
 | `WithInterceptor(i grpc.UnaryServerInterceptor)` | append a unary interceptor (repeatable) |
+| `WithServerOptions(options ...grpc.ServerOption)` | pass native gRPC server options |
 
-## Config mapping
+## Configuration
 
-`WithConfig` maps `*manifest.GRPCServerConfig.Features`: `Reflection` and
-`HealthCheck`. (The `Port` is used where you decide to listen — see serving
-above — the initr itself does not bind.) Any value can be overridden by a
-later option.
+`grpcinitr.Config` owns `Reflection` and `HealthCheck`; the application owns
+the port and any aggregation of server instances. `WithConfig` applies feature
+values, and later options override them. `WithInterceptor` and
+`WithServerOptions` are deliberate native gRPC escape hatches.
+
+Options are sealed: callers can compose the named options but cannot mutate
+grpcinitr's private construction state.
 
 ## Lifecycle
 
 `Close(ctx)` gracefully stops the server, falling back to a hard stop if the
-context expires — bounded, so it cannot hang `apin.App` shutdown. Safe to
-call after `Serve` already shut the server down. Implementing `apin.Closer`,
-it slots directly into `apin.App.Track`.
+App's shutdown context expires. It does not create a separate deadline or
+handle process signals. Safe to call after `Serve` returns. Implementing
+`apin.Closer`, it slots directly into `apin.App.Track`.
 
 Track order matters: track the server shell *after* the databases it depends
 on, so reverse-order shutdown stops serving before closing connections.

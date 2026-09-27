@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,6 +37,9 @@ type Shell struct {
 	Pool *pgxpool.Pool
 	// Conn is set when Mode is ModeConn.
 	Conn *pgx.Conn
+
+	poolCloseOnce sync.Once
+	poolCloseDone chan struct{}
 }
 
 func MustNew(ctx context.Context, opts ...Option) *Shell {
@@ -47,14 +51,23 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	store, err := newStore(opts)
+	config, err := resolveConfig(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	switch store.Mode {
+	switch config.mode {
 	case ModeConn:
-		conn, err := pgx.Connect(ctx, store.URI.String())
+		connConfig, err := pgx.ParseConfig(config.uri.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse postgres config: %w", err)
+		}
+		for _, configure := range config.connOptions {
+			if err := configure(connConfig); err != nil {
+				return nil, fmt.Errorf("pginitr: native connection config: %w", err)
+			}
+		}
+		conn, err := pgx.ConnectConfig(ctx, connConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 		}
@@ -63,11 +76,13 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 			Conn: conn,
 		}, nil
 	case ModePool:
-		cfg, err := pgxpool.ParseConfig(store.URI.String())
+		cfg, err := pgxpool.ParseConfig(config.uri.String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse postgres config: %w", err)
 		}
-		applyPoolConfig(cfg, store.Pool)
+		if err := applyPoolConfigOptions(cfg, config.poolOptions); err != nil {
+			return nil, fmt.Errorf("pginitr: native pool config: %w", err)
+		}
 
 		pool, err := pgxpool.NewWithConfig(ctx, cfg)
 		if err != nil {
@@ -75,35 +90,59 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 		}
 
 		return &Shell{
-			Mode: ModePool,
-			Pool: pool,
+			Mode:          ModePool,
+			Pool:          pool,
+			poolCloseDone: make(chan struct{}),
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid pginitr mode: %q", store.Mode)
+		return nil, fmt.Errorf("invalid pginitr mode: %q", config.mode)
 	}
 }
 
-func newStore(opts []Option) (*Store, error) {
-	store := &Store{
-		URI:  &url.URL{Scheme: "postgres"},
-		Mode: ModePool,
+func resolveConfig(opts []Option) (*resolvedConfig, error) {
+	config := &resolvedConfig{
+		uri:  &url.URL{Scheme: "postgres"},
+		mode: ModePool,
 	}
-	if err := apply(store, opts); err != nil {
+	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
 
 	// Compose the pending port with the host, regardless of option order.
-	if store.Port != "" {
-		if host := store.URI.Hostname(); host != "" {
-			store.URI.Host = net.JoinHostPort(host, store.Port)
+	if config.port != "" {
+		if host := config.uri.Hostname(); host != "" {
+			config.uri.Host = net.JoinHostPort(host, config.port)
 		}
 	}
 
-	if store.URI.User == nil && store.URI.Host == "" && store.URI.Path == "" {
+	if config.uri.User == nil && config.uri.Host == "" && config.uri.Path == "" {
 		return nil, fmt.Errorf("pginitr: no postgres configuration provided; pass WithConfig, WithURI, or connection options such as WithHost/WithDBName")
 	}
+	if err := validateConfig(config); err != nil {
+		return nil, err
+	}
 
-	return store, nil
+	return config, nil
+}
+
+func applyPoolConfigOptions(config *pgxpool.Config, options []poolConfigOption) error {
+	defaults := config.Copy()
+	for _, option := range options {
+		if option.tuning != nil {
+			config.MaxConns = defaults.MaxConns
+			config.MinConns = defaults.MinConns
+			config.MaxConnLifetime = defaults.MaxConnLifetime
+			config.MaxConnIdleTime = defaults.MaxConnIdleTime
+			config.HealthCheckPeriod = defaults.HealthCheckPeriod
+			applyPoolConfig(config, *option.tuning)
+		}
+		if option.configure != nil {
+			if err := option.configure(config); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func applyPoolConfig(cfg *pgxpool.Config, pool PoolConfig) {
@@ -137,6 +176,18 @@ func (shell *Shell) DB() (Querier, error) {
 	return nil, fmt.Errorf("pginitr: shell is not initialized")
 }
 
+// Ping verifies PostgreSQL connectivity using the shell's active connection
+// mode. Callers can bound the probe by passing a context with a deadline.
+func (shell *Shell) Ping(ctx context.Context) error {
+	if shell.Conn != nil {
+		return shell.Conn.Ping(ctx)
+	}
+	if shell.Pool != nil {
+		return shell.Pool.Ping(ctx)
+	}
+	return fmt.Errorf("pginitr: shell is not initialized")
+}
+
 // Close releases the underlying connection or pool.
 func (shell *Shell) Close(ctx context.Context) error {
 	switch {
@@ -145,7 +196,20 @@ func (shell *Shell) Close(ctx context.Context) error {
 			return fmt.Errorf("failed to close postgres connection: %w", err)
 		}
 	case shell.Pool != nil:
-		shell.Pool.Close()
+		shell.poolCloseOnce.Do(func() {
+			if shell.poolCloseDone == nil {
+				shell.poolCloseDone = make(chan struct{})
+			}
+			go func() {
+				shell.Pool.Close()
+				close(shell.poolCloseDone)
+			}()
+		})
+		select {
+		case <-shell.poolCloseDone:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return nil
 }

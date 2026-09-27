@@ -1,44 +1,62 @@
-// Package main is a minimal apin service: apin.New loads the service
-// manifest, three initrs (logging, postgres, grpc) turn its config sections
-// into shells, and the apin.App it returned owns the lifecycle.
+// Package main is a minimal service: the application defines the aggregate
+// configuration it needs, and apin.App owns the lifecycle.
 //
-// Run it with a local postgres matching config.json; SIGINT/SIGTERM shut
-// everything down in reverse initialization order.
+// Run it with a local postgres matching config.json (or set APIN_CONFIG to a
+// JSON/YAML config path); SIGINT/SIGTERM shut everything down in reverse
+// initialization order.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"os"
+	"sort"
+	"time"
 
 	"github.com/47monad/apin"
+	"github.com/47monad/apin/config"
 	"github.com/47monad/apin/initrs/grpcinitr"
+	"github.com/47monad/apin/initrs/httpinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
 )
 
+type serviceConfig struct {
+	Name     string            `json:"name" yaml:"name"`
+	Logging  zapinitr.Config   `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config   `json:"postgres" yaml:"postgres"`
+	GRPC     grpcinitr.Config  `json:"grpc" yaml:"grpc"`
+	HTTP     serviceHTTPConfig `json:"http" yaml:"http"`
+}
+
+type serviceHTTPConfig struct {
+	Servers map[string]httpinitr.Config `json:"servers" yaml:"servers"`
+}
+
+const grpcPort = 50051
+
 func main() {
 	ctx := context.Background()
 
-	// Parse the config file. The env file is optional.
-	app, err := apin.New(
-		apin.WithConfig("config.json"),
-		apin.WithEnv(".env"),
-	)
+	configPath := os.Getenv("APIN_CONFIG")
+	if configPath == "" {
+		configPath = "config.json"
+	}
+	cfg, err := loadServiceConfig(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg := app.Config()
-
-	// Logger initr: cross-cutting, returns apin.LoggerShell. It needs the
-	// config apin.New just loaded, and the app needs its logger, so the two
-	// meet here: RegisterLogger installs it after construction.
+	// Logger initr returns its own shell; App owns its lifecycle and shutdown.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.RegisterLogger(loggerShell)
+	app := apin.New(apin.WithLogger(loggerShell.Logger))
+	app.Track(loggerShell)
 
 	// Postgres: config-file values, with a per-field programmatic override.
 	dbShell, err := pginitr.New(ctx,
@@ -49,6 +67,18 @@ func main() {
 		log.Fatal(err)
 	}
 	app.Track(dbShell)
+	readyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingErr := dbShell.Ping(readyCtx)
+	cancel()
+	if pingErr != nil {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
+		cleanupErr := app.Close(cleanupCtx)
+		cleanupCancel()
+		if cleanupErr != nil {
+			pingErr = errors.Join(pingErr, cleanupErr)
+		}
+		log.Fatalf("postgres is not ready: %v", pingErr)
+	}
 
 	// Query without branching on the shell mode.
 	querier, err := dbShell.DB()
@@ -57,16 +87,45 @@ func main() {
 	}
 	loggerShell.Logger.Info("postgres ready", "querier", fmt.Sprintf("%T", querier))
 
-	grpcCfg := cfg.GRPC.Servers["api"]
 	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&grpcCfg),
+		grpcinitr.WithConfig(&cfg.GRPC),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 	app.Track(srvShell)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
+	httpServerNames := make([]string, 0, len(cfg.HTTP.Servers))
+	for name := range cfg.HTTP.Servers {
+		httpServerNames = append(httpServerNames, name)
+	}
+	sort.Strings(httpServerNames)
+	httpRunnables := make([]apin.Runnable, 0, len(httpServerNames))
+	for _, name := range httpServerNames {
+		serverConfig := cfg.HTTP.Servers[name]
+		httpMux := http.NewServeMux()
+		httpMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+		httpShell, err := httpinitr.New(ctx,
+			httpinitr.WithConfig(&serverConfig),
+			httpinitr.WithHandler(httpMux),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		app.Track(httpShell)
+
+		httpListener, err := httpShell.Listen()
+		if err != nil {
+			log.Fatal(err)
+		}
+		httpRunnables = append(httpRunnables, func(ctx context.Context) error {
+			return httpShell.Serve(ctx, httpListener)
+		})
+	}
+
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,9 +135,19 @@ func main() {
 	// registered by the initr.
 
 	// Run until SIGINT/SIGTERM or failure; shells close in reverse order.
-	if err := app.Run(ctx, func(ctx context.Context) error {
-		return srvShell.Serve(ctx, lis)
-	}); err != nil {
+	runnables := []apin.Runnable{
+		func(ctx context.Context) error { return srvShell.Serve(ctx, lis) },
+	}
+	runnables = append(runnables, httpRunnables...)
+	if err := app.Run(ctx, runnables...); err != nil {
 		loggerShell.Logger.Error(err, "application failed")
 	}
+}
+
+func loadServiceConfig(path string) (serviceConfig, error) {
+	var cfg serviceConfig
+	if err := config.Load(path, "", &cfg); err != nil {
+		return serviceConfig{}, err
+	}
+	return cfg, nil
 }

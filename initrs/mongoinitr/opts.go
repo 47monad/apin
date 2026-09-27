@@ -1,27 +1,41 @@
 package mongoinitr
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
-	"github.com/47monad/apin/manifest"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// Store is the resolved configuration of a shell.
-type Store struct {
-	Opts        *options.ClientOptions
-	DBName      string
-	PingTimeout time.Duration
+// Config contains MongoDB connection settings owned by mongoinitr.
+type Config struct {
+	URI    string `json:"uri" yaml:"uri" env:"mongodb_uri"`
+	DBName string `json:"dbName" yaml:"dbName" env:"mongodb_db_name"`
 }
 
-// Option mutates the store. Options are applied in the order they are passed
-// to New, so later options win.
-type Option func(*Store) error
+// resolvedConfig is private construction state owned by mongoinitr.
+type resolvedConfig struct {
+	clientOptions *options.ClientOptions
+	dbName        string
+	pingTimeout   time.Duration
+}
 
-// WithConfig applies a manifest config section. It is the entry point for
+// Option is a sealed functional option accepted by New.
+type Option interface {
+	apply(*resolvedConfig) error
+}
+
+type optionFunc func(*resolvedConfig) error
+
+func (option optionFunc) apply(config *resolvedConfig) error {
+	return option(config)
+}
+
+// WithConfig applies an initializer-owned config section. It is the entry point for
 // config-file driven setups.
-func WithConfig(config *manifest.MongodbConfig) Option {
-	return func(s *Store) error {
+func WithConfig(config *Config) Option {
+	return optionFunc(func(s *resolvedConfig) error {
 		if config == nil {
 			return nil
 		}
@@ -29,49 +43,61 @@ func WithConfig(config *manifest.MongodbConfig) Option {
 			WithURI(config.URI),
 			WithDBName(config.DBName),
 		})
-	}
+	})
 }
 
 // WithURI applies a mongodb connection URI.
 func WithURI(uri string) Option {
-	return func(s *Store) error {
-		s.Opts.ApplyURI(uri)
+	return optionFunc(func(s *resolvedConfig) error {
+		s.clientOptions.ApplyURI(uri)
 		return nil
-	}
+	})
 }
 
 // WithTimeout sets the driver connect timeout.
 func WithTimeout(d time.Duration) Option {
-	return func(s *Store) error {
-		s.Opts.SetConnectTimeout(d)
+	return optionFunc(func(s *resolvedConfig) error {
+		s.clientOptions.SetConnectTimeout(d)
 		return nil
-	}
+	})
 }
 
 // WithDBName sets the default database of the returned shell.
 func WithDBName(name string) Option {
-	return func(s *Store) error {
-		s.DBName = name
+	return optionFunc(func(s *resolvedConfig) error {
+		s.dbName = name
 		return nil
-	}
+	})
 }
 
 // WithPingTimeout sets the readiness ping timeout. Defaults to 10s.
 func WithPingTimeout(d time.Duration) Option {
-	return func(s *Store) error {
-		s.PingTimeout = d
+	return optionFunc(func(s *resolvedConfig) error {
+		s.pingTimeout = d
 		return nil
-	}
+	})
 }
 
-func apply(s *Store, opts []Option) error {
+// WithNativeClientOptions configures driver options not represented by Config
+// or the named mongoinitr options.
+func WithNativeClientOptions(configure func(*options.ClientOptions) error) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		if configure != nil {
+			return configure(s.clientOptions)
+		}
+		return nil
+	})
+}
+
+func apply(s *resolvedConfig, opts []Option) error {
+	var errs []error
 	for _, opt := range opts {
 		if opt == nil {
 			continue
 		}
-		if err := opt(s); err != nil {
-			return err
+		if err := opt.apply(s); err != nil {
+			errs = append(errs, fmt.Errorf("mongoinitr: apply option: %w", err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
