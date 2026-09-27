@@ -1,6 +1,6 @@
 module github.com/47monad/apin/initrs/mongoinitr
 
-go 1.24.0
+go 1.27.0
 
 require go.mongodb.org/mongo-driver/v2 v2.2.1
 

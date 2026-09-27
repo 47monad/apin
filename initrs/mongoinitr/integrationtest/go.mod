@@ -1,14 +1,14 @@
 module github.com/47monad/apin/initrs/mongoinitr/integrationtest
 
-go 1.24.0
+go 1.27.0
 
 replace github.com/47monad/apin/config => ../../../config
 
 replace github.com/47monad/apin/initrs/mongoinitr => ..
 
 require (
-	github.com/47monad/apin/config v0.0.0
-	github.com/47monad/apin/initrs/mongoinitr v0.0.0
+	github.com/47monad/apin/config v0.1.0
+	github.com/47monad/apin/initrs/mongoinitr v0.1.0
 	github.com/stretchr/testify v1.10.0
 )
 

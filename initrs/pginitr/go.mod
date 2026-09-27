@@ -1,6 +1,6 @@
 module github.com/47monad/apin/initrs/pginitr
 
-go 1.24.3
+go 1.27.0
 
 require github.com/jackc/pgx/v5 v5.7.5
 

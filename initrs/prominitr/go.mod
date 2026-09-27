@@ -1,6 +1,6 @@
 module github.com/47monad/apin/initrs/prominitr
 
-go 1.24.0
+go 1.27.0
 
 require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1

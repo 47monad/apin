@@ -16,9 +16,9 @@ func TestExampleAggregateLoadsSelectedInitializers(t *testing.T) {
 			t.Setenv("GRPC_HEALTH_CHECK", "")
 			t.Setenv("POSTGRES_HOST", "")
 
-			var cfg serviceConfig
-			if err := config.Load(path, "", &cfg); err != nil {
-				t.Fatalf("config.Load() error = %v", err)
+			cfg, err := loadServiceConfig(path)
+			if err != nil {
+				t.Fatalf("loadServiceConfig() error = %v", err)
 			}
 			if cfg.HTTP.Servers["api"].Port != 4747 {
 				t.Errorf("HTTP.Servers[api].Port = %d, want 4747", cfg.HTTP.Servers["api"].Port)

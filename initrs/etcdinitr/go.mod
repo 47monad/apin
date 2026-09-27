@@ -1,6 +1,6 @@
 module github.com/47monad/apin/initrs/etcdinitr
 
-go 1.24.0
+go 1.27.0
 
 require go.etcd.io/etcd/client/v3 v3.6.0
 

@@ -1,14 +1,14 @@
 module github.com/47monad/apin/examples/grpcsvc
 
-go 1.24.3
+go 1.27.0
 
 require (
-	github.com/47monad/apin v0.0.10-0.20250719080514-402b80009edb
-	github.com/47monad/apin/config v0.0.0
-	github.com/47monad/apin/initrs/grpcinitr v0.0.0
-	github.com/47monad/apin/initrs/httpinitr v0.0.0
-	github.com/47monad/apin/initrs/pginitr v0.0.0
-	github.com/47monad/apin/initrs/zapinitr v0.0.0
+	github.com/47monad/apin v0.1.0
+	github.com/47monad/apin/config v0.1.0
+	github.com/47monad/apin/initrs/grpcinitr v0.1.0
+	github.com/47monad/apin/initrs/httpinitr v0.1.0
+	github.com/47monad/apin/initrs/pginitr v0.1.0
+	github.com/47monad/apin/initrs/zapinitr v0.1.0
 )
 
 require (
@@ -33,8 +33,6 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/47monad/apin => ../..
 
 replace github.com/47monad/apin/config => ../../config
 

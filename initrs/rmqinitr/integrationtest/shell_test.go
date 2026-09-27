@@ -1,4 +1,4 @@
-package rmqinitr_test
+package integrationtest
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/47monad/apin/initrs/rmqinitr" // Replace with your actual module path
+	"github.com/47monad/apin/initrs/rmqinitr"
 	dockerContainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"

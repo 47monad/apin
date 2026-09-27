@@ -1,8 +1,9 @@
 // Package main is a minimal service: the application defines the aggregate
 // configuration it needs, and apin.App owns the lifecycle.
 //
-// Run it with a local postgres matching config.json; SIGINT/SIGTERM shut
-// everything down in reverse initialization order.
+// Run it with a local postgres matching config.json (or set APIN_CONFIG to a
+// JSON/YAML config path); SIGINT/SIGTERM shut everything down in reverse
+// initialization order.
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"sort"
 
 	"github.com/47monad/apin"
@@ -38,8 +40,12 @@ const grpcPort = 50051
 func main() {
 	ctx := context.Background()
 
-	var cfg serviceConfig
-	if err := config.Load("config.json", "", &cfg); err != nil {
+	configPath := os.Getenv("APIN_CONFIG")
+	if configPath == "" {
+		configPath = "config.json"
+	}
+	cfg, err := loadServiceConfig(configPath)
+	if err != nil {
 		log.Fatal(err)
 	}
 	// Logger initr returns its own shell; App owns its lifecycle and shutdown.
@@ -122,4 +128,12 @@ func main() {
 	if err := app.Run(ctx, runnables...); err != nil {
 		loggerShell.Logger.Error(err, "application failed")
 	}
+}
+
+func loadServiceConfig(path string) (serviceConfig, error) {
+	var cfg serviceConfig
+	if err := config.Load(path, "", &cfg); err != nil {
+		return serviceConfig{}, err
+	}
+	return cfg, nil
 }
