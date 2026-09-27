@@ -17,7 +17,7 @@ func TestNewDefaultsAndConfigOptionPrecedence(t *testing.T) {
 	require.Equal(t, ":4747", defaultShell.Server.Addr)
 	require.NoError(t, defaultShell.Close(context.Background()))
 
-	config := &httpinitr.Config{Port: 9000}
+	config := &httpinitr.ServerConfig{Port: 9000}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -35,6 +35,23 @@ func TestNewDefaultsAndConfigOptionPrecedence(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, response.Code)
 }
 
+func TestNamedConfigCreatesIndependentServerShells(t *testing.T) {
+	config := httpinitr.Config{Servers: map[string]httpinitr.ServerConfig{
+		"public": {Port: 8081},
+		"admin":  {Port: 8082},
+	}}
+	public, err := httpinitr.NewServer(context.Background(), config.Servers["public"])
+	require.NoError(t, err)
+	admin, err := httpinitr.NewServer(context.Background(), config.Servers["admin"])
+	require.NoError(t, err)
+	defer public.Close(context.Background())
+	defer admin.Close(context.Background())
+
+	require.NotSame(t, public, admin)
+	require.Equal(t, ":8081", public.Server.Addr)
+	require.Equal(t, ":8082", admin.Server.Addr)
+}
+
 func TestNewRejectsInvalidPort(t *testing.T) {
 	_, err := httpinitr.New(context.Background(), httpinitr.WithPort(65536))
 	require.ErrorContains(t, err, "httpinitr: port must be between 1 and 65535")
@@ -42,7 +59,7 @@ func TestNewRejectsInvalidPort(t *testing.T) {
 
 func TestFinalPortValidationAllowsLaterOverride(t *testing.T) {
 	shell, err := httpinitr.New(context.Background(),
-		httpinitr.WithConfig(&httpinitr.Config{Port: 65536}),
+		httpinitr.WithConfig(&httpinitr.ServerConfig{Port: 65536}),
 		httpinitr.WithPort(8123),
 	)
 	require.NoError(t, err)

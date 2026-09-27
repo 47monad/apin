@@ -19,7 +19,7 @@ import (
 )
 
 func TestConfigAndOptionsControlFeatures(t *testing.T) {
-	configured, err := grpcinitr.New(t.Context(), grpcinitr.WithConfig(&grpcinitr.Config{
+	configured, err := grpcinitr.New(t.Context(), grpcinitr.WithConfig(&grpcinitr.ServerConfig{
 		Reflection:  true,
 		HealthCheck: true,
 	}))
@@ -29,7 +29,7 @@ func TestConfigAndOptionsControlFeatures(t *testing.T) {
 	require.Contains(t, services, "grpc.reflection.v1.ServerReflection")
 
 	overridden, err := grpcinitr.New(t.Context(),
-		grpcinitr.WithConfig(&grpcinitr.Config{Reflection: true, HealthCheck: true}),
+		grpcinitr.WithConfig(&grpcinitr.ServerConfig{Reflection: true, HealthCheck: true}),
 		grpcinitr.WithReflection(false),
 		grpcinitr.WithHealthCheck(false),
 	)
@@ -41,6 +41,57 @@ func TestConfigAndOptionsControlFeatures(t *testing.T) {
 	optionOnly, err := grpcinitr.New(t.Context(), grpcinitr.WithReflection(true))
 	require.NoError(t, err)
 	require.Contains(t, optionOnly.Server.GetServiceInfo(), "grpc.reflection.v1.ServerReflection")
+}
+
+func TestNamedConfigCreatesIndependentlyManagedServersAndClients(t *testing.T) {
+	config := grpcinitr.Config{
+		Servers: map[string]grpcinitr.ServerConfig{
+			"public": {Reflection: true, Port: 50051},
+			"admin":  {HealthCheck: true, Port: 50052},
+		},
+		Clients: map[string]grpcinitr.ClientConfig{
+			"billing": {Target: "passthrough:///billing"},
+			"orders":  {Target: "passthrough:///orders"},
+		},
+	}
+
+	public, err := grpcinitr.NewServer(t.Context(), config.Servers["public"])
+	require.NoError(t, err)
+	admin, err := grpcinitr.NewServer(t.Context(), config.Servers["admin"])
+	require.NoError(t, err)
+	billing, err := grpcinitr.NewClient(t.Context(), config.Clients["billing"],
+		grpcinitr.WithDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	)
+	require.NoError(t, err)
+	orders, err := grpcinitr.NewClient(t.Context(), config.Clients["orders"],
+		grpcinitr.WithDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	)
+	require.NoError(t, err)
+
+	require.NotSame(t, public, admin)
+	require.Contains(t, public.Server.GetServiceInfo(), "grpc.reflection.v1.ServerReflection")
+	require.NotContains(t, public.Server.GetServiceInfo(), "grpc.health.v1.Health")
+	require.Contains(t, admin.Server.GetServiceInfo(), "grpc.health.v1.Health")
+	require.NotContains(t, admin.Server.GetServiceInfo(), "grpc.reflection.v1.ServerReflection")
+	require.Equal(t, 50051, public.Port)
+	require.Equal(t, 50052, admin.Port)
+	require.NotNil(t, billing.Conn)
+	require.NotNil(t, orders.Conn)
+
+	require.NoError(t, public.Close(t.Context()))
+	require.NoError(t, billing.Close(t.Context()))
+	require.Equal(t, "SHUTDOWN", billing.Conn.GetState().String())
+	require.NotEqual(t, "SHUTDOWN", orders.Conn.GetState().String())
+	require.NoError(t, admin.Close(t.Context()))
+	require.NoError(t, orders.Close(t.Context()))
+	require.Equal(t, "SHUTDOWN", orders.Conn.GetState().String())
+}
+
+func TestNamedServerConfigValidation(t *testing.T) {
+	_, err := grpcinitr.NewServer(t.Context(), grpcinitr.ServerConfig{Port: 65536})
+	require.ErrorContains(t, err, "grpcinitr: port must be between 1 and 65535")
+	_, err = grpcinitr.NewClient(t.Context(), grpcinitr.ClientConfig{})
+	require.ErrorContains(t, err, "grpcinitr: client target is required")
 }
 
 func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
