@@ -59,6 +59,31 @@ func TestOptionPrecedenceAndCompositionThroughNew(t *testing.T) {
 	}
 }
 
+func TestConfigURIPreservesHostWhenDiscreteHostIsUnset(t *testing.T) {
+	stop := errors.New("stop before connect")
+	var captured *pgx.ConnConfig
+
+	_, err := pginitr.New(context.Background(),
+		pginitr.WithConfig(&pginitr.Config{
+			URI:  "postgres://uri-host:5432/uridb",
+			Mode: pginitr.ModeConn,
+		}),
+		pginitr.WithNativeConnConfig(func(config *pgx.ConnConfig) error {
+			captured = config.Copy()
+			return stop
+		}),
+	)
+	if !errors.Is(err, stop) {
+		t.Fatalf("New() error = %v, want native configuration sentinel", err)
+	}
+	if captured == nil {
+		t.Fatal("native config option was not called")
+	}
+	if captured.Host != "uri-host" {
+		t.Errorf("native host = %q, want URI host %q", captured.Host, "uri-host")
+	}
+}
+
 func TestPortOptionOrderIndependenceThroughNew(t *testing.T) {
 	stop := errors.New("stop before connect")
 	var captured *pgx.ConnConfig

@@ -68,8 +68,10 @@ func WithConfig(config *Config) Option {
 		if config.Username != "" || config.Password != "" {
 			opts = append(opts, WithUser(url.UserPassword(config.Username, config.Password)))
 		}
+		if config.Host != "" {
+			opts = append(opts, WithHost(config.Host))
+		}
 		opts = append(opts,
-			WithHost(config.Host),
 			WithPort(config.Port),
 			WithDBName(config.DBName),
 			WithSSLMode(config.SSLMode),
