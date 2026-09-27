@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,6 +37,9 @@ type Shell struct {
 	Pool *pgxpool.Pool
 	// Conn is set when Mode is ModeConn.
 	Conn *pgx.Conn
+
+	poolCloseOnce sync.Once
+	poolCloseDone chan struct{}
 }
 
 func MustNew(ctx context.Context, opts ...Option) *Shell {
@@ -86,8 +90,9 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 		}
 
 		return &Shell{
-			Mode: ModePool,
-			Pool: pool,
+			Mode:          ModePool,
+			Pool:          pool,
+			poolCloseDone: make(chan struct{}),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid pginitr mode: %q", config.mode)
@@ -191,7 +196,20 @@ func (shell *Shell) Close(ctx context.Context) error {
 			return fmt.Errorf("failed to close postgres connection: %w", err)
 		}
 	case shell.Pool != nil:
-		shell.Pool.Close()
+		shell.poolCloseOnce.Do(func() {
+			if shell.poolCloseDone == nil {
+				shell.poolCloseDone = make(chan struct{})
+			}
+			go func() {
+				shell.Pool.Close()
+				close(shell.poolCloseDone)
+			}()
+		})
+		select {
+		case <-shell.poolCloseDone:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return nil
 }

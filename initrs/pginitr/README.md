@@ -118,5 +118,8 @@ escape hatch for driver settings not modeled by pginitr.
 
 ## Lifecycle
 
-`Close(ctx)` closes the single connection (with error) or the pool.
+`Close(ctx)` closes the single connection (with error) or starts closing the
+pool. pgx's pool close has no context-aware API, so if the supplied context
+expires while checked-out connections are still active, `Close` returns the
+context error and the pool continues draining in the background.
 Implementing `apin.Closer`, it slots directly into `apin.App.Track`.

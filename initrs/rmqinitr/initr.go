@@ -42,15 +42,20 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 		return nil, fmt.Errorf("rmqinitr: max retry interval (%v) is lower than min (%v)", config.maxRetryInterval, config.minRetryInterval)
 	}
 
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	shell := &Shell{
-		stopChan: make(chan struct{}),
-		config:   config,
-		logger:   config.logger,
+		stopChan:     make(chan struct{}),
+		config:       config,
+		logger:       config.logger,
+		workerCtx:    workerCtx,
+		cancelWorker: cancelWorker,
+		closeDone:    make(chan struct{}),
 	}
 
 	if !config.lazyConnect {
-		conn, ch, err := shell.tryConnect()
+		conn, ch, err := shell.tryConnect(ctx)
 		if err != nil {
+			cancelWorker()
 			return nil, err
 		}
 		shell.conn = conn

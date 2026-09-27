@@ -75,6 +75,10 @@ behavior.
 
 ## Lifecycle
 
-`Close(ctx)` is idempotent: it stops the reconnect loop, waits for it, and
-closes the connection/channel. Implementing `apin.Closer`, it slots directly
-into `apin.App.Track`.
+`Close(ctx)` is idempotent: it stops the reconnect loop, cancels and interrupts
+an in-progress network dial/AMQP handshake, and closes the connection/channel.
+It waits only until `ctx` is done; if native resource cleanup is still running,
+that cleanup continues in the background. A custom `WithNativeDialConfig` dial
+callback has no context parameter, but shutdown still returns by the supplied
+deadline; a callback that never returns may leave its own goroutine running.
+Implementing `apin.Closer`, it slots directly into `apin.App.Track`.
