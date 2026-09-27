@@ -8,12 +8,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/47monad/apin"
 	"github.com/47monad/apin/config"
@@ -65,6 +67,18 @@ func main() {
 		log.Fatal(err)
 	}
 	app.Track(dbShell)
+	readyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingErr := dbShell.Ping(readyCtx)
+	cancel()
+	if pingErr != nil {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
+		cleanupErr := app.Close(cleanupCtx)
+		cleanupCancel()
+		if cleanupErr != nil {
+			pingErr = errors.Join(pingErr, cleanupErr)
+		}
+		log.Fatalf("postgres is not ready: %v", pingErr)
+	}
 
 	// Query without branching on the shell mode.
 	querier, err := dbShell.DB()

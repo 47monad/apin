@@ -132,3 +132,17 @@ func TestNewFromOptionsExposesNativeClient(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
+
+func TestReadyHonorsCanceledContext(t *testing.T) {
+	shell, err := etcdinitr.New(context.Background(), etcdinitr.WithEndpoints([]string{"127.0.0.1:2379"}))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer shell.Close(context.Background())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := shell.Ready(ctx); err == nil {
+		t.Fatal("Ready() error = nil, want canceled-context error")
+	}
+}

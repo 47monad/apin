@@ -104,10 +104,13 @@ func main() {
 }
 ```
 
-A returned shell is ready to use (connections are verified at `New`), and
-`app.Run` blocks until a runnable fails, the context is cancelled, or
-SIGINT/SIGTERM — then closes every tracked shell in reverse initialization
-order.
+A returned shell provides access to its native client. Connectivity is
+initializer-specific: PostgreSQL pool mode and etcd clients are constructed
+lazily, while PostgreSQL single-connection mode connects during `New`. Call
+`pginitr.Shell.Ping` or `etcdinitr.Shell.Ready` with a deadline-bearing
+context when startup must verify reachability. `app.Run` blocks until a
+runnable fails, the context is cancelled, or SIGINT/SIGTERM — then closes
+every tracked shell in reverse initialization order.
 
 A complete runnable version of this lives in
 [`examples/grpcsvc`](examples/grpcsvc), including its application-owned
@@ -117,12 +120,15 @@ aggregate configuration.
 
 Every initr follows the same contract, so any service reads the same way:
 
-1. **Shells.** Each initr returns a `Shell` — the ready-to-use handle for its
+1. **Shells.** Each initr returns a `Shell` — the initialized handle for its
    service (e.g. `pginitr.Shell`, `rmqinitr.Shell`). Cross-cutting shells
    (logging) return an initializer-owned shell exposing `logr.Logger`.
 2. **Construction.** `New(ctx, opts ...Option)` and `MustNew(ctx, opts...)`.
-   `New` connects eagerly and fails fast on missing configuration or dial
-   errors.
+   `New` validates configuration and constructs the native client; connection
+   verification is initializer-specific. PostgreSQL pool mode and etcd use
+   lazy client construction; PostgreSQL single-connection mode connects
+   eagerly. PostgreSQL exposes `Ping(ctx)` and etcd exposes `Ready(ctx)` for
+   explicit connectivity checks.
 3. **Options.** Functional options (`Option func(*Store) error`) are applied
    in order; later options win.
 4. **Config entry point.** Each initializer can accept its own configuration
@@ -148,9 +154,9 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Module | Shell | Notes |
 |---|---|---|
-| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | pool (default) or single connection; `DB()` gives a mode-independent query surface |
+| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | lazy connectivity; `Ping(ctx)` verifies the active pool or connection; `DB()` gives a mode-independent query surface |
 | [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection |
-| [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | |
+| [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |

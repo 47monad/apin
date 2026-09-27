@@ -1,6 +1,6 @@
 # etcdinitr
 
-etcd initr. Returns a ready-to-use shell holding an etcd
+etcd initr. Returns a shell holding an etcd
 [`clientv3.Client`](https://pkg.go.dev/go.etcd.io/etcd/client/v3#Client).
 
 ```bash
@@ -22,6 +22,14 @@ if err := config.Load("service.yaml", ".env", &cfg); err != nil {
 }
 
 etcdShell, err := etcdinitr.New(ctx, etcdinitr.WithConfig(cfg.Etcd))
+if err != nil {
+	return err
+}
+readyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+if err := etcdShell.Ready(readyCtx); err != nil {
+	return err
+}
 
 // config file + overrides
 etcdShell, err := etcdinitr.New(ctx,
@@ -37,8 +45,10 @@ etcdShell, err := etcdinitr.New(ctx,
 )
 ```
 
-`New` connects eagerly and fails fast on dial errors — a returned shell is
-ready to use.
+`New` validates the configuration and constructs the native client without
+verifying endpoint connectivity. Call `Ready(ctx)` to check whether any
+configured endpoint responds to an etcd status request. Pass a
+deadline-bearing context to bound the check.
 
 ## Shell
 
@@ -47,6 +57,10 @@ type Shell struct {
 	Client *clientv3.Client
 }
 ```
+
+`Ready(ctx)` returns nil when any configured endpoint responds; otherwise it
+returns an error containing the endpoint failures. An uninitialized shell
+returns an error.
 
 ## Options
 
