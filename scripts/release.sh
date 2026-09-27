@@ -20,7 +20,6 @@ fi
 
 release_modules=(
 	.
-	config
 	initrs/etcdinitr
 	initrs/grpcinitr
 	initrs/httpinitr
@@ -61,10 +60,12 @@ for go_mod in "${module_files[@]}"; do
 	echo "validating Go module ${module_dir#./}"
 	(
 		cd "$repo_root/$module_dir"
-		if [[ "$module_dir" == "./examples/grpcsvc" ]]; then
-			check_mod="$temp_root/grpcsvc.mod"
+		# Validate dependent modules against this checkout, before the root release exists.
+		if grep -Eq '^[[:space:]]*github\.com/47monad/apin v' go.mod; then
+			check_mod="$temp_root/${module_dir//\//_}.mod"
+			check_sum="${check_mod%.mod}.sum"
 			cp go.mod "$check_mod"
-			if [[ -f go.sum ]]; then cp go.sum "$temp_root/grpcsvc.sum"; fi
+			if [[ -f go.sum ]]; then cp go.sum "$check_sum"; fi
 			go mod edit -modfile="$check_mod" -replace="github.com/47monad/apin=$repo_root"
 			go mod tidy -diff -modfile="$check_mod"
 			go build -modfile="$check_mod" ./...

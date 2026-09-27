@@ -1,15 +1,22 @@
 go 1.27.0
 
+replace github.com/47monad/apin v0.1.0 => .
+
 use (
 	.
-	./config
 	./examples/grpcsvc
+	./integrationtest/lifecycle
 	./initrs/etcdinitr
+	./initrs/etcdinitr/integrationtest
 	./initrs/grpcinitr
+	./initrs/grpcinitr/integrationtest
 	./initrs/httpinitr
 	./initrs/mongoinitr
+	./initrs/mongoinitr/integrationtest
 	./initrs/pginitr
 	./initrs/prominitr
+	./initrs/prominitr/integrationtest
 	./initrs/rmqinitr
+	./initrs/rmqinitr/integrationtest
 	./initrs/zapinitr
 )

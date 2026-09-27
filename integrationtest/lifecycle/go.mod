@@ -20,8 +20,6 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 )
 
-replace github.com/47monad/apin => ../..
-
 replace github.com/47monad/apin/initrs/pginitr => ../../initrs/pginitr
 
 replace github.com/47monad/apin/initrs/rmqinitr => ../../initrs/rmqinitr

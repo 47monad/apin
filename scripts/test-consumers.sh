@@ -66,3 +66,25 @@ for module_dir in "${modules[@]}"; do
 		exit 1
 	fi
 done
+
+consumer_dir="$temp_root/apin"
+mkdir -p "$consumer_dir"
+printf 'module example.invalid/apin-consumer\n\ngo 1.27.0\n\nrequire github.com/47monad/apin v0.1.0\n\nreplace github.com/47monad/apin => %s\n' \
+	"$repo_root" > "$consumer_dir/go.mod"
+printf 'package consumer\n\nimport (\n\t"github.com/47monad/apin"\n\t"github.com/47monad/apin/config"\n)\n\nvar _ = apin.New\nvar _ = config.Load\n' \
+	> "$consumer_dir/consumer.go"
+printf 'package consumer_test\n\nimport (\n\t"testing"\n\t"github.com/47monad/apin"\n\t"github.com/47monad/apin/config"\n)\n\nfunc TestLifecycleAndConfigShareRootModule(t *testing.T) {\n\t_ = apin.New\n\t_ = config.Load\n}\n' \
+	> "$consumer_dir/consumer_test.go"
+
+echo "checking temporary consumer for github.com/47monad/apin and /config"
+(
+	cd "$consumer_dir"
+	GOWORK=off go mod tidy
+	GOWORK=off go test ./...
+	GOWORK=off go list -deps -f '{{.ImportPath}}' . > deps.txt
+)
+
+if ! grep -qx 'github.com/47monad/apin' "$consumer_dir/deps.txt" || ! grep -qx 'github.com/47monad/apin/config' "$consumer_dir/deps.txt"; then
+	echo "root consumer did not resolve both lifecycle and config packages from apin" >&2
+	exit 1
+fi

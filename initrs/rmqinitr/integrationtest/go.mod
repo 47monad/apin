@@ -2,12 +2,10 @@ module github.com/47monad/apin/initrs/rmqinitr/integrationtest
 
 go 1.27.0
 
-replace github.com/47monad/apin/config => ../../../config
-
 replace github.com/47monad/apin/initrs/rmqinitr => ..
 
 require (
-	github.com/47monad/apin/config v0.1.0
+	github.com/47monad/apin v0.1.0
 	github.com/47monad/apin/initrs/rmqinitr v0.1.0
 	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-connections v0.5.0

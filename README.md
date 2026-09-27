@@ -190,7 +190,7 @@ initializer installs process signal handlers.
 
 ## Configuration
 
-The standalone `config` module loads JSON or YAML into an application-owned
+The `github.com/47monad/apin/config` package loads JSON or YAML into an application-owned
 aggregate. PostgreSQL configuration belongs to `pginitr.Config`; the
 application includes only the initializer types it selects:
 
@@ -220,7 +220,7 @@ An initializer can also be configured entirely through options.
 ## Repository Layout
 
 - `common.go`, `app.go` — minimal lifecycle module (`App`, `Closer`, `Runnable`)
-- `config/` — standalone JSON/YAML loading and environment overlays
+- `config/` — JSON/YAML loading and environment overlays, shipped with the root `apin` module
 - `closr/` — the `Closer` alias, kept for compatibility
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
