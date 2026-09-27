@@ -1,7 +1,5 @@
 go 1.27.0
 
-replace github.com/47monad/apin v0.1.0 => .
-
 use (
 	.
 	./examples/grpcsvc
