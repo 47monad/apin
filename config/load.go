@@ -18,8 +18,9 @@ import (
 )
 
 // Load decodes configPath into destination, then overlays values from envPath
-// and the process environment. Process environment values take precedence over
-// .env values, which take precedence over values in the configuration file.
+// and the process environment. A missing envPath is optional. Process
+// environment values take precedence over values from envPath, which take
+// precedence over values in the configuration file.
 // destination must be a non-nil pointer.
 func Load(configPath, envPath string, destination any) error {
 	dst := reflect.ValueOf(destination)

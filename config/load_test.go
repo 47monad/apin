@@ -71,6 +71,29 @@ func TestLoadJSONYAMLAndEnvironmentPrecedence(t *testing.T) {
 	}
 }
 
+func TestLoadIgnoresMissingOptionalEnvFile(t *testing.T) {
+	t.Setenv("APP_NAME", "from-process")
+	configPath := writeFile(t, "app.json", `{"name":"from-file"}`)
+	envPath := filepath.Join(t.TempDir(), ".env")
+	var got applicationConfig
+	if err := config.Load(configPath, envPath, &got); err != nil {
+		t.Fatalf("Load() with missing optional env file error = %v", err)
+	}
+	if got.Name != "from-process" {
+		t.Errorf("Name = %q, want process environment value", got.Name)
+	}
+}
+
+func TestLoadStillReportsEnvPathErrorsOtherThanMissing(t *testing.T) {
+	configPath := writeFile(t, "app.json", `{}`)
+	envPath := t.TempDir()
+	var got applicationConfig
+	err := config.Load(configPath, envPath, &got)
+	if err == nil || !strings.Contains(err.Error(), envPath) {
+		t.Fatalf("Load() error = %v, want error containing env path %q", err, envPath)
+	}
+}
+
 func TestLoadRejectsInvalidDocumentsAndDestination(t *testing.T) {
 	tests := []struct {
 		name string
