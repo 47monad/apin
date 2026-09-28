@@ -11,21 +11,25 @@ go get github.com/47monad/apin/initrs/grpcinitr
 ## Usage
 
 ```go
-// app-owned config; the initializer owns only server features
-srvShell, err := grpcinitr.New(ctx, grpcinitr.WithConfig(&grpcinitr.Config{
-	Reflection: true,
-	HealthCheck: true,
-}))
+// serviceConfig can use grpcinitr.Config directly. It describes any number
+// of named servers and clients.
+type serviceConfig struct {
+	GRPC grpcinitr.Config `json:"grpc" yaml:"grpc"`
+}
 
-// config file + service registration + interceptors
-srvShell, err := grpcinitr.New(ctx,
-	grpcinitr.WithConfig(&grpcCfg.Features),
+serverConfig := cfg.GRPC.Servers["api"]
+srvShell, err := grpcinitr.NewServer(ctx, serverConfig,
 	grpcinitr.WithRunnable(func(s *grpc.Server) {
 		pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 	}),
 	grpcinitr.WithInterceptor(authInterceptor),
 	grpcinitr.WithServerOptions(grpc.MaxRecvMsgSize(4<<20)),
 )
+
+clientShell, err := grpcinitr.NewClient(ctx, cfg.GRPC.Clients["billing"],
+	grpcinitr.WithDialOptions(grpc.WithTransportCredentials(credentials)),
+)
+app.Track(clientShell) // every connection has its own shell and lifecycle
 ```
 
 ## Serving
@@ -36,7 +40,7 @@ shells with its single shutdown deadline, and the shell gracefully stops its
 native gRPC server:
 
 ```go
-lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
+lis, err := net.Listen("tcp", fmt.Sprintf(":%d", srvShell.Port))
 
 app.Run(ctx, func(ctx context.Context) error {
 	return srvShell.Serve(ctx, lis)
@@ -60,7 +64,9 @@ type ServerShell struct {
 
 | Option | Description |
 |---|---|
-| `WithConfig(*grpcinitr.Config)` | apply initializer-owned feature settings |
+| `WithConfig(*grpcinitr.ServerConfig)` | apply settings for one server |
+| `NewServer(ctx, ServerConfig, ...)` | construct one independently managed server |
+| `NewClient(ctx, ClientConfig, ...)` | construct one independently managed client connection |
 | `WithReflection(enabled bool)` | register the gRPC reflection service |
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
@@ -69,10 +75,13 @@ type ServerShell struct {
 
 ## Configuration
 
-`grpcinitr.Config` owns `Reflection` and `HealthCheck`; the application owns
-the port and any aggregation of server instances. `WithConfig` applies feature
-values, and later options override them. `WithInterceptor` and
-`WithServerOptions` are deliberate native gRPC escape hatches.
+`grpcinitr.Config` owns named `Servers` and `Clients` maps. `ServerConfig`
+owns each server's port, reflection, and health-check settings; `ClientConfig`
+owns each client's target. Applications can construct and track any number of
+resource shells independently. Later options override config values.
+`WithInterceptor`, `WithServerOptions`, and `WithDialOptions` are deliberate
+native gRPC escape hatches. `NewClient` is lazy and does not prove endpoint
+reachability; use the native connection for calls and health/readiness policy.
 
 Options are sealed: callers can compose the named options but cannot mutate
 grpcinitr's private construction state.

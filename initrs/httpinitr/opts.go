@@ -23,7 +23,7 @@ func (option optionFunc) apply(config *resolvedConfig) error {
 }
 
 // WithConfig applies an httpinitr-owned configuration.
-func WithConfig(config *Config) Option {
+func WithConfig(config *ServerConfig) Option {
 	return optionFunc(func(store *resolvedConfig) error {
 		if config == nil {
 			return nil

@@ -15,8 +15,7 @@ type serviceConfig struct {
 }
 
 mux := http.NewServeMux()
-shell, err := httpinitr.New(ctx,
-	httpinitr.WithConfig(&cfg.HTTP),
+shell, err := httpinitr.NewServer(ctx, cfg.HTTP.Servers["api"],
 	httpinitr.WithHandler(mux),
 )
 if err != nil {
@@ -32,7 +31,8 @@ return app.Run(ctx, func(ctx context.Context) error {
 })
 ```
 
-`Config.Port` defaults to `4747` and accepts ports from `1` through `65535`.
+`Config.Servers` contains named `ServerConfig` entries. Each server port
+defaults to `4747` and accepts ports from `1` through `65535`.
 `WithPort` overrides it; later options win. `WithHandler` sets the handler,
 and `Server` exposes the native `*http.Server` for additional configuration.
 `ServerShell.Close(ctx)` gracefully shuts down, falling back to closing
@@ -43,6 +43,5 @@ Options are sealed: callers can compose the named options but cannot mutate
 httpinitr's private construction state. Advanced native HTTP server settings
 remain available through `ServerShell.Server`.
 
-For multiple named listeners, keep a `map[string]httpinitr.Config` in the
-application aggregate and create one tracked shell per entry. The runnable
-example preserves the former named-server configuration shape this way.
+Create and track one shell per selected entry in `Config.Servers`; application
+code does not need another HTTP configuration struct.

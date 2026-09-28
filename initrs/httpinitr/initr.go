@@ -56,6 +56,23 @@ func New(_ context.Context, opts ...Option) (*ServerShell, error) {
 	if err := apply(config, opts); err != nil {
 		return nil, err
 	}
+	return newServer(config)
+}
+
+// NewServer constructs one independently managed server from an entry in
+// Config.Servers.
+func NewServer(_ context.Context, serverConfig ServerConfig, opts ...Option) (*ServerShell, error) {
+	config := &resolvedConfig{port: defaultPort}
+	if err := apply(config, []Option{WithConfig(&serverConfig)}); err != nil {
+		return nil, err
+	}
+	if err := apply(config, opts); err != nil {
+		return nil, err
+	}
+	return newServer(config)
+}
+
+func newServer(config *resolvedConfig) (*ServerShell, error) {
 	if config.port == 0 {
 		config.port = defaultPort
 	}

@@ -9,14 +9,9 @@ import (
 	"github.com/47monad/apin/initrs/grpcinitr"
 )
 
-type serverConfig struct {
-	Port     int              `json:"port" yaml:"port"`
-	Features grpcinitr.Config `json:"features" yaml:"features"`
-}
-
 type serviceConfig struct {
-	Name    string                  `json:"name" yaml:"name"`
-	Servers map[string]serverConfig `json:"servers" yaml:"servers"`
+	Name string           `json:"name" yaml:"name"`
+	GRPC grpcinitr.Config `json:"grpc" yaml:"grpc"`
 }
 
 func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
@@ -25,7 +20,7 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		root := t.TempDir()
 		configPath := filepath.Join(root, "service.json")
 		envPath := filepath.Join(root, ".env")
-		if err := os.WriteFile(configPath, []byte(`{"name":"json","servers":{"api":{"port":50051,"features":{"reflection":false,"healthCheck":false}}}}`), 0o600); err != nil {
+		if err := os.WriteFile(configPath, []byte(`{"name":"json","grpc":{"servers":{"api":{"port":50051,"reflection":false,"healthCheck":false}},"clients":{"billing":{"target":"dns:///billing:50051"}}}}`), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(envPath, []byte("API_GRPC_REFLECTION=true\nAPI_GRPC_HEALTH_CHECK=true\n"), 0o600); err != nil {
@@ -36,8 +31,8 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		if err := config.Load(configPath, envPath, &cfg); err != nil {
 			t.Fatal(err)
 		}
-		api := cfg.Servers["api"]
-		if cfg.Name != "json" || api.Port != 50051 || api.Features.Reflection || !api.Features.HealthCheck {
+		api := cfg.GRPC.Servers["api"]
+		if cfg.Name != "json" || api.Port != 50051 || api.Reflection || !api.HealthCheck || cfg.GRPC.Clients["billing"].Target != "dns:///billing:50051" {
 			t.Fatalf("unexpected environment overlay: %#v", cfg)
 		}
 	})
@@ -46,7 +41,7 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		t.Setenv("API_GRPC_REFLECTION", "")
 		t.Setenv("API_GRPC_HEALTH_CHECK", "")
 		configPath := filepath.Join(t.TempDir(), "service.yml")
-		if err := os.WriteFile(configPath, []byte("name: yaml\nservers:\n  api:\n    port: 50052\n    features:\n      reflection: true\n      healthCheck: false\n"), 0o600); err != nil {
+		if err := os.WriteFile(configPath, []byte("name: yaml\ngrpc:\n  servers:\n    api:\n      port: 50052\n      reflection: true\n      healthCheck: false\n  clients:\n    billing:\n      target: dns:///billing:50052\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -54,8 +49,8 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		if err := config.Load(configPath, "", &cfg); err != nil {
 			t.Fatal(err)
 		}
-		api := cfg.Servers["api"]
-		if cfg.Name != "yaml" || api.Port != 50052 || !api.Features.Reflection || api.Features.HealthCheck {
+		api := cfg.GRPC.Servers["api"]
+		if cfg.Name != "yaml" || api.Port != 50052 || !api.Reflection || api.HealthCheck || cfg.GRPC.Clients["billing"].Target != "dns:///billing:50052" {
 			t.Fatalf("unexpected YAML configuration: %#v", cfg)
 		}
 	})

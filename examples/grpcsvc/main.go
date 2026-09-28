@@ -23,21 +23,17 @@ import (
 	"github.com/47monad/apin/initrs/httpinitr"
 	"github.com/47monad/apin/initrs/pginitr"
 	"github.com/47monad/apin/initrs/zapinitr"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type serviceConfig struct {
-	Name     string            `json:"name" yaml:"name"`
-	Logging  zapinitr.Config   `json:"logging" yaml:"logging"`
-	Postgres *pginitr.Config   `json:"postgres" yaml:"postgres"`
-	GRPC     grpcinitr.Config  `json:"grpc" yaml:"grpc"`
-	HTTP     serviceHTTPConfig `json:"http" yaml:"http"`
+	Name     string           `json:"name" yaml:"name"`
+	Logging  zapinitr.Config  `json:"logging" yaml:"logging"`
+	Postgres *pginitr.Config  `json:"postgres" yaml:"postgres"`
+	GRPC     grpcinitr.Config `json:"grpc" yaml:"grpc"`
+	HTTP     httpinitr.Config `json:"http" yaml:"http"`
 }
-
-type serviceHTTPConfig struct {
-	Servers map[string]httpinitr.Config `json:"servers" yaml:"servers"`
-}
-
-const grpcPort = 50051
 
 func main() {
 	ctx := context.Background()
@@ -87,13 +83,44 @@ func main() {
 	}
 	loggerShell.Logger.Info("postgres ready", "querier", fmt.Sprintf("%T", querier))
 
-	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&cfg.GRPC),
-	)
-	if err != nil {
-		log.Fatal(err)
+	grpcServerNames := make([]string, 0, len(cfg.GRPC.Servers))
+	for name := range cfg.GRPC.Servers {
+		grpcServerNames = append(grpcServerNames, name)
 	}
-	app.Track(srvShell)
+	sort.Strings(grpcServerNames)
+	grpcRunnables := make([]apin.Runnable, 0, len(grpcServerNames))
+	for _, name := range grpcServerNames {
+		serverConfig := cfg.GRPC.Servers[name]
+		srvShell, err := grpcinitr.NewServer(ctx, serverConfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+		app.Track(srvShell)
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", srvShell.Port))
+		if err != nil {
+			log.Fatal(err)
+		}
+		grpcRunnables = append(grpcRunnables, func(ctx context.Context) error {
+			return srvShell.Serve(ctx, lis)
+		})
+	}
+
+	grpcClientNames := make([]string, 0, len(cfg.GRPC.Clients))
+	for name := range cfg.GRPC.Clients {
+		grpcClientNames = append(grpcClientNames, name)
+	}
+	sort.Strings(grpcClientNames)
+	for _, name := range grpcClientNames {
+		clientShell, err := grpcinitr.NewClient(ctx, cfg.GRPC.Clients[name],
+			// The sample uses plaintext credentials; real deployments should
+			// supply their own native transport credentials.
+			grpcinitr.WithDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		app.Track(clientShell)
+	}
 
 	httpServerNames := make([]string, 0, len(cfg.HTTP.Servers))
 	for name := range cfg.HTTP.Servers {
@@ -107,8 +134,7 @@ func main() {
 		httpMux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		})
-		httpShell, err := httpinitr.New(ctx,
-			httpinitr.WithConfig(&serverConfig),
+		httpShell, err := httpinitr.NewServer(ctx, serverConfig,
 			httpinitr.WithHandler(httpMux),
 		)
 		if err != nil {
@@ -125,19 +151,8 @@ func main() {
 		})
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Register real services here, e.g. pb.RegisterUserServiceServer(s, ...)
-	// inside a grpcinitr.WithRunnable option; the health server is already
-	// registered by the initr.
-
 	// Run until SIGINT/SIGTERM or failure; shells close in reverse order.
-	runnables := []apin.Runnable{
-		func(ctx context.Context) error { return srvShell.Serve(ctx, lis) },
-	}
+	runnables := grpcRunnables
 	runnables = append(runnables, httpRunnables...)
 	if err := app.Run(ctx, runnables...); err != nil {
 		loggerShell.Logger.Error(err, "application failed")

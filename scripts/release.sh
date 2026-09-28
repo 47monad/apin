@@ -65,7 +65,12 @@ for go_mod in "${module_files[@]}"; do
 			check_mod="$temp_root/${module_dir//\//_}.mod"
 			check_sum="${check_mod%.mod}.sum"
 			cp go.mod "$check_mod"
-			if [[ -f go.sum ]]; then cp go.sum "$check_sum"; fi
+			if [[ -f go.sum ]]; then
+				cp go.sum "$check_sum"
+				# The replacement uses this checkout rather than the published root
+				# module, so its version checksums are unused in the temporary graph.
+				sed -i '/^github\.com\/47monad\/apin v/d' "$check_sum"
+			fi
 			go mod edit -modfile="$check_mod" -replace="github.com/47monad/apin=$repo_root"
 			go mod tidy -diff -modfile="$check_mod"
 			go build -modfile="$check_mod" ./...

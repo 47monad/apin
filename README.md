@@ -43,16 +43,7 @@ type serviceConfig struct {
 	Name     string                 `json:"name" yaml:"name"`
 	Logging  zapinitr.Config        `json:"logging" yaml:"logging"`
 	Postgres *pginitr.Config        `json:"postgres" yaml:"postgres"`
-	GRPC     *grpcConfig            `json:"grpc" yaml:"grpc"`
-}
-
-type grpcConfig struct {
-	Servers map[string]grpcServerConfig `json:"servers" yaml:"servers"`
-}
-
-type grpcServerConfig struct {
-	Port     int               `json:"port" yaml:"port"`
-	Features grpcinitr.Config `json:"features" yaml:"features"`
+	GRPC     grpcinitr.Config  `json:"grpc" yaml:"grpc"`
 }
 
 func main() {
@@ -80,8 +71,7 @@ func main() {
 	app.Track(dbShell)
 
 	grpcCfg := cfg.GRPC.Servers["api"]
-	srvShell, err := grpcinitr.New(ctx,
-		grpcinitr.WithConfig(&grpcCfg.Features),
+	srvShell, err := grpcinitr.NewServer(ctx, grpcCfg,
 		grpcinitr.WithRunnable(func(s *grpc.Server) {
 			pb.RegisterUserServiceServer(s, &userServer{db: dbShell})
 		}),
@@ -91,7 +81,7 @@ func main() {
 	}
 	app.Track(srvShell)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcCfg.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", srvShell.Port))
 	if err != nil {
 		log.Fatal(err)
 	}

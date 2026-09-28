@@ -20,8 +20,22 @@
 		}
 	},
 	"grpc": {
-		"reflection": true,
-		"healthCheck": true
+		"servers": {
+			"api": {
+				"port": 50051,
+				"reflection": true,
+				"healthCheck": true
+			},
+			"admin": {
+				"port": 50052,
+				"healthCheck": true
+			}
+		},
+		"clients": {
+			"billing": {
+				"target": "dns:///billing:50051"
+			}
+		}
 	},
 	"http": {
 		"servers": {
