@@ -36,6 +36,15 @@ type serviceConfig struct {
 }
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// run returns any startup or run failure instead of exiting, so the single
+// deferred App.Close below still releases every tracked shell when startup
+// fails partway through.
+func run() (err error) {
 	ctx := context.Background()
 
 	configPath := os.Getenv("APIN_CONFIG")
@@ -44,15 +53,26 @@ func main() {
 	}
 	cfg, err := loadServiceConfig(configPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	// Logger initr returns its own shell; App owns its lifecycle and shutdown.
 	loggerShell, err := zapinitr.New(ctx, zapinitr.WithConfig(&cfg.Logging))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	app := apin.New(apin.WithLogger(loggerShell.Logger))
 	app.Track(loggerShell)
+
+	// One bounded cleanup owns every shell tracked from here on, including the
+	// shells registered before a startup failure. App.Run closes them itself on
+	// the normal path; this Close is then a no-op.
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
+		defer cancel()
+		if closeErr := app.Close(closeCtx); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	// Postgres: config-file values, with a per-field programmatic override.
 	dbShell, err := pginitr.New(ctx,
@@ -60,26 +80,20 @@ func main() {
 		pginitr.WithSSLMode("disable"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	app.Track(dbShell)
 	readyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	pingErr := dbShell.Ping(readyCtx)
 	cancel()
 	if pingErr != nil {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), app.ShutdownTimeout())
-		cleanupErr := app.Close(cleanupCtx)
-		cleanupCancel()
-		if cleanupErr != nil {
-			pingErr = errors.Join(pingErr, cleanupErr)
-		}
-		log.Fatalf("postgres is not ready: %v", pingErr)
+		return fmt.Errorf("postgres is not ready: %w", pingErr)
 	}
 
 	// Query without branching on the shell mode.
 	querier, err := dbShell.DB()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	loggerShell.Logger.Info("postgres ready", "querier", fmt.Sprintf("%T", querier))
 
@@ -93,12 +107,12 @@ func main() {
 		serverConfig := cfg.GRPC.Servers[name]
 		srvShell, err := grpcinitr.NewServer(ctx, serverConfig)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		app.Track(srvShell)
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", srvShell.Port))
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		grpcRunnables = append(grpcRunnables, func(ctx context.Context) error {
 			return srvShell.Serve(ctx, lis)
@@ -117,7 +131,7 @@ func main() {
 			grpcinitr.WithDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		app.Track(clientShell)
 	}
@@ -138,13 +152,13 @@ func main() {
 			httpinitr.WithHandler(httpMux),
 		)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		app.Track(httpShell)
 
 		httpListener, err := httpShell.Listen()
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		httpRunnables = append(httpRunnables, func(ctx context.Context) error {
 			return httpShell.Serve(ctx, httpListener)
@@ -154,9 +168,11 @@ func main() {
 	// Run until SIGINT/SIGTERM or failure; shells close in reverse order.
 	runnables := grpcRunnables
 	runnables = append(runnables, httpRunnables...)
-	if err := app.Run(ctx, runnables...); err != nil {
-		loggerShell.Logger.Error(err, "application failed")
+	if runErr := app.Run(ctx, runnables...); runErr != nil {
+		loggerShell.Logger.Error(runErr, "application failed")
+		return runErr
 	}
+	return nil
 }
 
 func loadServiceConfig(path string) (serviceConfig, error) {
