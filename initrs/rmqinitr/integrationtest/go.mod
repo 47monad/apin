@@ -7,8 +7,6 @@ replace github.com/47monad/apin/initrs/rmqinitr => ..
 require (
 	github.com/47monad/apin v0.1.0
 	github.com/47monad/apin/initrs/rmqinitr v0.1.0
-	github.com/docker/docker v28.0.1+incompatible
-	github.com/docker/go-connections v0.5.0
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.37.0
@@ -24,6 +22,8 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
+	github.com/docker/docker v28.0.1+incompatible // indirect
+	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.8.2 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
