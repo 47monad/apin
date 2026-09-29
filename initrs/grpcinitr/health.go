@@ -11,7 +11,9 @@ import (
 const healthCheckTimeout = 2 * time.Second
 
 // RunHealthCheck periodically updates the registered gRPC health service.
-// The checker should honor its context so it can be interrupted on shutdown.
+// The first checker result is always published, so a named service starts as
+// SERVING or NOT_SERVING instead of staying SERVICE_UNKNOWN. The checker
+// should honor its context so it can be interrupted on shutdown.
 func (shell *ServerShell) RunHealthCheck(ctx context.Context, service string, interval time.Duration, checker func(context.Context) bool) error {
 	if shell == nil || shell.HealthServer == nil {
 		return errors.New("grpcinitr: health checking is not enabled")
@@ -27,6 +29,7 @@ func (shell *ServerShell) RunHealthCheck(ctx context.Context, service string, in
 	defer ticker.Stop()
 
 	serving := true
+	published := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -38,7 +41,7 @@ func (shell *ServerShell) RunHealthCheck(ctx context.Context, service string, in
 			if ctx.Err() != nil {
 				return nil
 			}
-			if isServing == serving {
+			if published && isServing == serving {
 				continue
 			}
 			status := healthgrpc.HealthCheckResponse_NOT_SERVING
@@ -47,6 +50,7 @@ func (shell *ServerShell) RunHealthCheck(ctx context.Context, service string, in
 			}
 			shell.HealthServer.SetServingStatus(service, status)
 			serving = isServing
+			published = true
 		}
 	}
 }
