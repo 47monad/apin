@@ -46,6 +46,14 @@ zapinitr's private construction state. `WithNativeConfig(func(*zap.Config) error
 is the deliberate escape hatch for zap output, encoding, sampling, and other
 native configuration.
 
-The shell exposes a `logr.Logger` and implements
-`Close(context.Context) error`, which flushes the native zap logger. The
-application decides when the shell is closed by tracking it with `App.Track`.
+The shell exposes two handles over the same logger core:
+
+- `Shell.Logger` is the `logr.Logger` view, for components that accept a
+  `logr.Logger` (for example `apin.WithLogger`).
+- `Shell.Zap` is the native `*zap.Logger`, for zap-specific features such as
+  structured fields or third-party integrations.
+
+The shell implements `Close(context.Context) error`, which flushes the native
+zap logger; sync errors from sinks that cannot be synced (stdout, stderr,
+pipes, terminals) are treated as benign. The application decides when to close
+it by tracking the shell with `App.Track`.
