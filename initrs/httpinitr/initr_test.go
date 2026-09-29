@@ -44,8 +44,8 @@ func TestNamedConfigCreatesIndependentServerShells(t *testing.T) {
 	require.NoError(t, err)
 	admin, err := httpinitr.NewServer(context.Background(), config.Servers["admin"])
 	require.NoError(t, err)
-	defer public.Close(context.Background())
-	defer admin.Close(context.Background())
+	defer func() { _ = public.Close(context.Background()) }()
+	defer func() { _ = admin.Close(context.Background()) }()
 
 	require.NotSame(t, public, admin)
 	require.Equal(t, ":8081", public.Server.Addr)

@@ -40,7 +40,7 @@ func TestAppRunShutdownDeadlineWithRabbitMQReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rmqinitr.New() error = %v", err)
 	}
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	var serverConn net.Conn
 	select {

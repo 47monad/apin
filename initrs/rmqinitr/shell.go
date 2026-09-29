@@ -139,7 +139,7 @@ func (r *Shell) tryConnect(ctx context.Context) (*amqp.Connection, *amqp.Channel
 
 	ch, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, nil, fmt.Errorf("failed to create channel: %w", err)
 	}
 

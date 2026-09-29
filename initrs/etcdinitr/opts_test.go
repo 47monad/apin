@@ -138,7 +138,7 @@ func TestReadyHonorsCanceledContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

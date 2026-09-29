@@ -63,7 +63,7 @@ func TestNewFromConfig_ValidConnection(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
 		rmqinitr.WithConfig(&rmqinitr.Config{URI: rabbitmqURI}))
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Wait for connection to establish
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -91,7 +91,7 @@ func TestNewRabbitManager_InvalidConnectionLazy(t *testing.T) {
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Should not become healthy with invalid connection
 	time.Sleep(2 * time.Second)
@@ -104,7 +104,7 @@ func TestGetChannel_WhenHealthy(t *testing.T) {
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Wait for connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -128,7 +128,7 @@ func TestGetChannel_WhenUnhealthy(t *testing.T) {
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Should not be able to get channel when unhealthy
 	ch, err := shell.GetChannel()
@@ -170,7 +170,7 @@ func TestReconnection_AfterConnectionLoss(t *testing.T) {
 			MinRetryInterval: seconds(1),
 		}))
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Wait for initial connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -207,7 +207,7 @@ func TestConcurrentAccess(t *testing.T) {
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Wait for connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -273,7 +273,7 @@ func TestWaitForHealth_Timeout(t *testing.T) {
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -289,7 +289,7 @@ func TestWaitForHealth_Success(t *testing.T) {
 			URI: rabbitmqURI,
 		}))
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -327,7 +327,7 @@ func TestExponentialBackoff(t *testing.T) {
 		}),
 		rmqinitr.WithLazyConnect())
 	require.NoError(t, err)
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	// Wait a bit to let several retry attempts happen
 	time.Sleep(8 * time.Second)
