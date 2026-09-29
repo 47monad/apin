@@ -40,7 +40,7 @@ func TestAppRunShutdownDeadlineWithPostgresPool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pginitr.New() error = %v", err)
 	}
-	defer shell.Close(context.Background())
+	defer func() { _ = shell.Close(context.Background()) }()
 
 	acquireCtx, acquireCancel := context.WithTimeout(context.Background(), time.Second)
 	defer acquireCancel()
@@ -78,7 +78,7 @@ func TestAppRunShutdownDeadlineWithPostgresPool(t *testing.T) {
 }
 
 func servePostgresStartup(conn net.Conn) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	backend := pgproto3.NewBackend(conn, conn)
 	if _, err := backend.ReceiveStartupMessage(); err != nil {
 		return

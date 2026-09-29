@@ -108,10 +108,10 @@ func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-	defer shell.Close(t.Context())
+	defer func() { _ = shell.Close(t.Context()) }()
 
 	listener := bufconn.Listen(1024 * 1024)
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	go func() { _ = shell.Server.Serve(listener) }()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
@@ -121,7 +121,7 @@ func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	_, err = grpc_health_v1.NewHealthClient(conn).Check(ctx, &grpc_health_v1.HealthCheckRequest{})
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
 func TestRunHealthCheckUpdatesHealthServiceAndStopsOnContext(t *testing.T) {
 	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
 	require.NoError(t, err)
-	defer shell.Close(t.Context())
+	defer func() { _ = shell.Close(t.Context()) }()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -179,7 +179,7 @@ func TestServeReturnsOnContextAndCloseStopsNativeServer(t *testing.T) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	checkCtx, checkCancel := context.WithTimeout(t.Context(), time.Second)
 	defer checkCancel()
 	_, err = grpc_health_v1.NewHealthClient(conn).Check(checkCtx, &grpc_health_v1.HealthCheckRequest{})
@@ -212,7 +212,7 @@ func TestCloseUsesCallerDeadlineToForceStop(t *testing.T) {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	invokeDone := make(chan error, 1)
 	go func() {

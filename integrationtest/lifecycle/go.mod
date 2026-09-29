@@ -23,3 +23,5 @@ require (
 replace github.com/47monad/apin/initrs/pginitr => ../../initrs/pginitr
 
 replace github.com/47monad/apin/initrs/rmqinitr => ../../initrs/rmqinitr
+
+replace github.com/47monad/apin => ../..
