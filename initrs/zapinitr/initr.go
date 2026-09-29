@@ -40,23 +40,38 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 		return nil, fmt.Errorf("failed to build zap logger: %w", err)
 	}
 
-	return &Shell{Logger: zapr.NewLoggerWithOptions(zapLog), zap: zapLog}, nil
+	return &Shell{Logger: zapr.NewLoggerWithOptions(zapLog), Zap: zapLog}, nil
 }
 
-// Shell exposes the logr logger and retains zap for lifecycle flushing.
+// Shell exposes the zapinitr logger handles and owns the native logger's
+// lifecycle.
 type Shell struct {
+	// Logger is the logr view of the native zap logger, suitable for
+	// components that accept a logr.Logger (for example apin.WithLogger).
 	Logger logr.Logger
-	zap    *zap.Logger
+	// Zap is the native zap logger backing Logger, for zap-specific features
+	// such as structured fields or third-party integrations. Close flushes it.
+	Zap *zap.Logger
 }
 
-// Close flushes buffered zap output. The context is accepted to satisfy the
-// common shell lifecycle contract; zap's Sync operation is synchronous.
+// Close flushes buffered zap output from the native logger. The context is
+// accepted to satisfy the common shell lifecycle contract; zap's Sync
+// operation is synchronous. Sync errors from sinks that cannot be synced
+// (stdout/stderr, pipes, terminals) are treated as benign.
 func (shell *Shell) Close(_ context.Context) error {
-	if shell == nil || shell.zap == nil {
+	if shell == nil || shell.Zap == nil {
 		return nil
 	}
-	if err := shell.zap.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) {
+	if err := shell.Zap.Sync(); err != nil && !isSyncBenign(err) {
 		return err
 	}
 	return nil
+}
+
+// isSyncBenign reports whether a Sync error comes from a sink that does not
+// support syncing. Such errors must not fail shutdown.
+func isSyncBenign(err error) bool {
+	return errors.Is(err, syscall.EINVAL) ||
+		errors.Is(err, syscall.ENOTTY) ||
+		errors.Is(err, syscall.EBADF)
 }
