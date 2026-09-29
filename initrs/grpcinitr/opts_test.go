@@ -165,6 +165,83 @@ func TestRunHealthCheckUpdatesHealthServiceAndStopsOnContext(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
+func TestRunHealthCheckPublishesFirstResult(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		check  bool
+		status grpc_health_v1.HealthCheckResponse_ServingStatus
+	}{
+		{name: "serving", check: true, status: grpc_health_v1.HealthCheckResponse_SERVING},
+		{name: "not serving", check: false, status: grpc_health_v1.HealthCheckResponse_NOT_SERVING},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
+			require.NoError(t, err)
+			defer func() { _ = shell.Close(t.Context()) }()
+
+			// Before the checker runs, the named service is not registered.
+			_, err = shell.HealthServer.Check(t.Context(), &grpc_health_v1.HealthCheckRequest{Service: "api"})
+			require.Error(t, err)
+			require.Equal(t, codes.NotFound, status.Code(err))
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			checked := make(chan struct{}, 1)
+			done := make(chan error, 1)
+			go func() {
+				done <- shell.RunHealthCheck(ctx, "api", time.Millisecond, func(context.Context) bool {
+					select {
+					case checked <- struct{}{}:
+					default:
+					}
+					return tc.check
+				})
+			}()
+
+			select {
+			case <-checked:
+			case <-time.After(time.Second):
+				t.Fatal("health checker was not called")
+			}
+
+			// The first result must be published even when it matches the
+			// optimistic default, rather than leaving SERVICE_UNKNOWN.
+			require.Eventually(t, func() bool {
+				response, err := shell.HealthServer.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{Service: "api"})
+				return err == nil && response.Status == tc.status
+			}, time.Second, 10*time.Millisecond, "first result %v was not published", tc.check)
+
+			cancel()
+			require.NoError(t, <-done)
+		})
+	}
+}
+
+func TestRunHealthCheckReturnsOnCancelBeforeFirstCheck(t *testing.T) {
+	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
+	require.NoError(t, err)
+	defer func() { _ = shell.Close(t.Context()) }()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	called := make(chan struct{}, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- shell.RunHealthCheck(ctx, "api", time.Hour, func(context.Context) bool {
+			called <- struct{}{}
+			return true
+		})
+	}()
+
+	cancel()
+	require.NoError(t, <-done)
+
+	select {
+	case <-called:
+		t.Fatal("checker ran after cancellation")
+	default:
+	}
+}
+
 func TestServeReturnsOnContextAndCloseStopsNativeServer(t *testing.T) {
 	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
 	require.NoError(t, err)
