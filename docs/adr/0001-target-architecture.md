@@ -18,8 +18,9 @@ recording it does not change production behavior.
 - Every initializer owns its configuration, defaults, and validation.
 - The native client remains accessible through its shell.
 - apin is optional lifecycle orchestration.
-- The configuration loader understands formats and environment overlays, but
-  no initializer vocabulary.
+- The configuration loader is a package in the root apin module, not an
+  independently installable module. It understands formats and environment
+  overlays, but no initializer vocabulary.
 - Applications define their own aggregate configuration from only the
   initializers they select.
 - App is the single lifecycle-policy owner.
@@ -34,5 +35,5 @@ application opts into apin orchestration. Initializers continue to expose
 their native clients through their shells.
 
 The implementation removes the central manifest and leaves applications,
-initializers, and the standalone format-focused loader with the ownership
-described above.
+initializers, and the root module's format-focused `config` package with the
+ownership described above.

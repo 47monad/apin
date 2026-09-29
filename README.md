@@ -119,8 +119,8 @@ Every initr follows the same contract, so any service reads the same way:
    lazy client construction; PostgreSQL single-connection mode connects
    eagerly. PostgreSQL exposes `Ping(ctx)` and etcd exposes `Ready(ctx)` for
    explicit connectivity checks.
-3. **Options.** Functional options (`Option func(*Store) error`) are applied
-   in order; later options win.
+3. **Options.** Functional options (`Option`) are applied in order; later
+   options win.
 4. **Config entry point.** Each initializer can accept its own configuration
 	type. Applications choose the fields they need and individual `With*`
 	options override single fields:
