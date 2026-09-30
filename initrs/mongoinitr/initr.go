@@ -2,6 +2,7 @@ package mongoinitr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,10 @@ type Shell struct {
 }
 
 const defaultPingTimeout = 10 * time.Second
+
+// disconnect releases a native client. It is a package-level function so tests
+// can observe and inject startup cleanup.
+var disconnect = (*mongo.Client).Disconnect
 
 func MustNew(ctx context.Context, opts ...Option) *Shell {
 	shell, err := New(ctx, opts...)
@@ -39,7 +44,16 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	defer cancel()
 
 	if err = client.Ping(pingCtx, nil); err != nil {
-		return nil, fmt.Errorf("problem pinging database: %w", err)
+		pingErr := fmt.Errorf("problem pinging database: %w", err)
+		// Disconnect with a fresh, bounded context: the ping context may
+		// already be expired, but the client still owns resources to release.
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), store.pingTimeout)
+		cleanupErr := disconnect(client, cleanupCtx)
+		cleanupCancel()
+		if cleanupErr != nil {
+			return nil, errors.Join(pingErr, fmt.Errorf("failed to disconnect from mongodb: %w", cleanupErr))
+		}
+		return nil, pingErr
 	}
 
 	shell := &Shell{Client: client}
@@ -72,7 +86,7 @@ func (shell *Shell) Close(ctx context.Context) error {
 		return nil
 	}
 
-	err := shell.Client.Disconnect(ctx)
+	err := disconnect(shell.Client, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to disconnect from mongodb: %w", err)
 	}
