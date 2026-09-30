@@ -38,7 +38,8 @@ dbShell, err := mongoinitr.New(ctx,
 ```
 
 `New` verifies the connection with a ping before returning — a returned shell
-is ready to use.
+is ready to use. If the ping fails, `New` disconnects the client before
+returning, joining the ping and cleanup errors.
 
 ## Shell
 
