@@ -59,6 +59,64 @@ func TestOptionPrecedenceAndCompositionThroughNew(t *testing.T) {
 	}
 }
 
+func TestURIQueryParameterPrecedence(t *testing.T) {
+	stop := errors.New("stop before connect")
+
+	// capture resolves the options and reports what pgx was handed, without
+	// connecting.
+	capture := func(t *testing.T, opts ...pginitr.Option) *pgx.ConnConfig {
+		t.Helper()
+		var captured *pgx.ConnConfig
+		opts = append(opts,
+			pginitr.WithSingleConn(),
+			pginitr.WithNativeConnConfig(func(config *pgx.ConnConfig) error {
+				captured = config.Copy()
+				return stop
+			}),
+		)
+		if _, err := pginitr.New(context.Background(), opts...); !errors.Is(err, stop) {
+			t.Fatalf("New() error = %v, want native configuration sentinel", err)
+		}
+		if captured == nil {
+			t.Fatal("native config option was not called")
+		}
+		return captured
+	}
+
+	// Options are applied in order, so the later URI wins on the parameters it
+	// carries and earlier parameters survive where the later URI is silent.
+	t.Run("later URI replaces same-named parameters", func(t *testing.T) {
+		captured := capture(t,
+			pginitr.WithURI("postgres://firstuser:firstpass@first:5432/firstdb?application_name=first&connect_timeout=7"),
+			pginitr.WithURI("postgres://seconduser:secondpass@second:5432/seconddb?application_name=second"),
+		)
+		if got := captured.RuntimeParams["application_name"]; got != "second" {
+			t.Errorf("application_name = %q, want %q from the later URI", got, "second")
+		}
+		if got, want := captured.ConnectTimeout, 7*time.Second; got != want {
+			t.Errorf("ConnectTimeout = %v, want %v carried over from the earlier URI", got, want)
+		}
+		if captured.Host != "second" || captured.User != "seconduser" || captured.Database != "seconddb" {
+			t.Errorf("native target = %s@%s/%s, want seconduser@second/seconddb from the later URI",
+				captured.User, captured.Host, captured.Database)
+		}
+	})
+
+	t.Run("later WithParam replaces URI parameters", func(t *testing.T) {
+		captured := capture(t,
+			pginitr.WithURI("postgres://host:5432/db?application_name=from-uri&sslmode=require"),
+			pginitr.WithParam("application_name", "from-param"),
+			pginitr.WithParam("sslmode", "disable"),
+		)
+		if got := captured.RuntimeParams["application_name"]; got != "from-param" {
+			t.Errorf("application_name = %q, want %q from the later WithParam", got, "from-param")
+		}
+		if captured.TLSConfig != nil {
+			t.Errorf("TLSConfig = %v, want nil for sslmode=disable", captured.TLSConfig)
+		}
+	})
+}
+
 func TestConfigURIPreservesHostWhenDiscreteHostIsUnset(t *testing.T) {
 	stop := errors.New("stop before connect")
 	var captured *pgx.ConnConfig

@@ -78,7 +78,7 @@ automatic reconnection — the pool is the default for a reason.
 | Option | Description |
 |---|---|
 | `WithConfig(*pginitr.Config)` | apply initializer-owned PostgreSQL configuration |
-| `WithURI(uri string)` | merge connection details from a postgres URI; query params preserved unless overridden later |
+| `WithURI(uri string)` | merge connection details from a postgres URI; same-named query params are replaced, the rest preserved |
 | `WithUser(*url.Userinfo)` | explicit credentials; takes precedence over URI-derived ones |
 | `WithHost(host string)` | database host |
 | `WithPort(port int)` | database port; composes with `WithHost`/URIs in any option order |
@@ -111,6 +111,12 @@ type PoolConfig struct {
 `AppName` → `application_name`, `ConnTimeout` → `connect_timeout`, `Mode`
 (`"pool"`/`"conn"`), and the `Pool` block. Any of these can be overridden by
 a later option.
+
+`Config.DSN()` builds the connection string from those fields for callers that
+need the URI itself: it returns `Config.URI` when set, otherwise it composes
+one from the discrete fields (default port 5432). An IPv6 host may be written
+bare (`fd00::1`) or bracketed (`[fd00::1]`); the composed DSN brackets it
+exactly once.
 
 Options are sealed: callers can combine the named options but cannot mutate
 pginitr's private construction state. Native pgx callbacks are the deliberate

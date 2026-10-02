@@ -89,7 +89,8 @@ func WithConfig(config *Config) Option {
 }
 
 // WithURI merges connection details from a postgres URI. Query params on the
-// URI are preserved unless overridden by later options.
+// URI replace same-named params set by earlier options, matching the
+// later-option-wins contract; params the URI omits are preserved.
 func WithURI(uri string) Option {
 	return optionFunc(func(s *resolvedConfig) error {
 		if uri == "" {
@@ -117,10 +118,11 @@ func WithURI(uri string) Option {
 			if err != nil {
 				return fmt.Errorf("failed to apply postgres URI: %w", err)
 			}
+			// Later options win: a same-named parameter on this URI replaces
+			// the one accumulated from earlier options. Assigning the whole
+			// slice keeps a URI's repeated parameters intact.
 			for key, values := range query {
-				if _, ok := existing[key]; !ok {
-					existing[key] = values
-				}
+				existing[key] = values
 			}
 			s.uri.RawQuery = existing.Encode()
 		}
