@@ -165,7 +165,9 @@ defer app.Close(context.Background()) // manual lifecycle control
 - `app.Track(shell...)` — record shells for cleanup (call it right after each `New`)
 - `app.Run(ctx, runnables...)` — start serving; on SIGINT/SIGTERM or context
   cancellation, runnables are cancelled and shells closed in reverse order,
-  bounded by a shutdown timeout (default 30s, `app.SetShutdownTimeout` to tune)
+  bounded by a shutdown timeout (default 30s, `apin.WithShutdownTimeout` at
+  construction or `app.SetShutdownTimeout` afterwards to tune; non-positive
+  values restore the 30s default)
 - A second signal cancels cleanup more aggressively; process termination
   remains the application's decision.
 
