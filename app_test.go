@@ -119,6 +119,84 @@ func (slowCloser) Close(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// briefCloser finishes quickly unless the shutdown context is already done,
+// so it only observes a bound that was expired before Close started.
+type briefCloser struct {
+	delay time.Duration
+}
+
+func (c briefCloser) Close(ctx context.Context) error {
+	select {
+	case <-time.After(c.delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func TestWithShutdownTimeout(t *testing.T) {
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "positive", timeout: 50 * time.Millisecond, want: 50 * time.Millisecond},
+		{name: "zero", timeout: 0, want: 30 * time.Second},
+		{name: "negative", timeout: -time.Second, want: 30 * time.Second},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			app := apin.New(apin.WithShutdownTimeout(tc.timeout))
+			if got := app.ShutdownTimeout(); got != tc.want {
+				t.Errorf("ShutdownTimeout() with WithShutdownTimeout(%v) = %v, want %v", tc.timeout, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWithShutdownTimeoutBoundsShutdownPhase(t *testing.T) {
+	var records []string
+	mu := &sync.Mutex{}
+
+	app := apin.New(apin.WithShutdownTimeout(50 * time.Millisecond))
+	app.Track(
+		&fakeShell{id: "fast", records: &records, mu: mu},
+		slowCloser{},
+		&fakeShell{id: "after", records: &records, mu: mu},
+	)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	err := app.Run(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Run() error = %v, want the shutdown deadline exceeded", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("Run() took %v, want it bounded by the shutdown timeout", elapsed)
+	}
+	// Shells close in reverse tracking order, and the slow shell is only
+	// released by the deadline, so the one after it still gets closed.
+	if len(records) != 2 || records[0] != "after" || records[1] != "fast" {
+		t.Errorf("close order = %v, want [after fast]", records)
+	}
+}
+
+// A non-positive constructor timeout restores the default, so shutdown work
+// still runs inside a live window instead of an already-expired context.
+func TestWithShutdownTimeoutZeroKeepsShutdownWindowLive(t *testing.T) {
+	app := apin.New(apin.WithShutdownTimeout(0))
+	app.Track(briefCloser{delay: 50 * time.Millisecond})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := app.Run(ctx); err != nil {
+		t.Fatalf("Run() error = %v, want the restored default to cover the closer", err)
+	}
+}
+
 func TestSetShutdownTimeout(t *testing.T) {
 	app := apin.New()
 	if got, want := app.ShutdownTimeout(), 30*time.Second; got != want {

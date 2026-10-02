@@ -36,10 +36,23 @@ func WithLogger(logger logr.Logger) AppOption {
 }
 
 // WithShutdownTimeout bounds the shutdown phase. Defaults to 30s.
+// Non-positive values restore the 30s default, the same as
+// SetShutdownTimeout, so an unset or accidental zero never bounds the
+// shutdown phase with an already-expired context.
 func WithShutdownTimeout(timeout time.Duration) AppOption {
 	return func(a *App) {
-		a.shutdownTimeout = timeout
+		a.shutdownTimeout = normalizeShutdownTimeout(timeout)
 	}
+}
+
+// normalizeShutdownTimeout maps a requested shutdown bound onto a usable one:
+// non-positive values fall back to the default rather than closing shells
+// with a context that is already done.
+func normalizeShutdownTimeout(timeout time.Duration) time.Duration {
+	if timeout <= 0 {
+		return defaultShutdownTimeout
+	}
+	return timeout
 }
 
 // New creates an App and applies the supplied lifecycle options.
@@ -85,12 +98,9 @@ func (app *App) SetLogger(logger logr.Logger) {
 // post-construction counterpart of the WithShutdownTimeout New option, for
 // apps built with New. Non-positive values restore the 30s default.
 func (app *App) SetShutdownTimeout(timeout time.Duration) *App {
-	if timeout <= 0 {
-		timeout = defaultShutdownTimeout
-	}
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	app.shutdownTimeout = timeout
+	app.shutdownTimeout = normalizeShutdownTimeout(timeout)
 	return app
 }
 
