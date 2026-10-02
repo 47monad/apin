@@ -48,7 +48,8 @@ func Load(configPath, envPath string, destination any) error {
 	if err != nil {
 		return fmt.Errorf("load config file %q: read env file %q: %w", configPath, envPath, err)
 	}
-	if err := applyEnv(dst.Elem(), "", dst.Elem().Type().Name(), vars); err != nil {
+	overlay := newEnvOverlay(vars)
+	if err := applyEnv(dst.Elem(), "", dst.Elem().Type().Name(), overlay); err != nil {
 		return fmt.Errorf("load config file %q: %w", configPath, err)
 	}
 	return nil
@@ -93,7 +94,44 @@ func decodeYAML(data []byte, destination any) error {
 	return nil
 }
 
-func applyEnv(value reflect.Value, prefix, path string, vars map[string]string) error {
+// envScope identifies one position in the destination: a type reached under an
+// environment-variable prefix. Two visits to the same scope on one path mean
+// the destination type is recursive and no map key separated the visits, so
+// descending again cannot make progress.
+type envScope struct {
+	typ    reflect.Type
+	prefix string
+}
+
+// envOverlay carries the state of one environment overlay. Nil pointers are the
+// only structure an overlay invents, so the scopes it is currently
+// materializing are tracked to keep a recursive type finite.
+type envOverlay struct {
+	vars     map[string]string
+	visited  map[envScope]bool
+	inFlight map[envScope]bool
+}
+
+func newEnvOverlay(vars map[string]string) *envOverlay {
+	return &envOverlay{
+		vars:     vars,
+		visited:  make(map[envScope]bool),
+		inFlight: make(map[envScope]bool),
+	}
+}
+
+// enter records scope as being visited on the current path and reports whether
+// the caller may descend into it. The returned function must be called when the
+// visit ends, so a later sibling of the same type is still visited.
+func (o *envOverlay) enter(scope envScope) (bool, func()) {
+	if o.visited[scope] {
+		return false, func() {}
+	}
+	o.visited[scope] = true
+	return true, func() { delete(o.visited, scope) }
+}
+
+func applyEnv(value reflect.Value, prefix, path string, overlay *envOverlay) error {
 	switch value.Kind() {
 	case reflect.Struct:
 		for i := 0; i < value.NumField(); i++ {
@@ -108,29 +146,39 @@ func applyEnv(value reflect.Value, prefix, path string, vars map[string]string) 
 				if prefix != "" {
 					key = prefix + "_" + key
 				}
-				if raw, ok := lookupEnv(key, vars); ok {
+				if raw, ok := lookupEnv(key, overlay.vars); ok {
 					if err := setEnvValue(fieldValue, raw); err != nil {
 						return fmt.Errorf("environment variable %s for field %s: %w", key, fieldPath, err)
 					}
 				}
 			}
-			if err := applyEnv(fieldValue, prefix, fieldPath, vars); err != nil {
+			if err := applyEnv(fieldValue, prefix, fieldPath, overlay); err != nil {
 				return err
 			}
 		}
 	case reflect.Pointer:
 		if value.IsNil() {
-			candidate := reflect.New(value.Type().Elem())
-			if !containsEnvValue(candidate.Elem(), prefix, vars) {
+			// A nil pointer is materialized only when the environment supplies a
+			// value beneath it. With this exact scope already in flight, a
+			// recursive type would chain instances forever, so the link stays
+			// nil rather than growing without a concrete instance to justify it.
+			scope := envScope{typ: value.Type(), prefix: prefix}
+			if overlay.inFlight[scope] {
 				return nil
 			}
-			if err := applyEnv(candidate.Elem(), prefix, path, vars); err != nil {
+			candidate := reflect.New(value.Type().Elem())
+			if !containsEnvValue(candidate.Elem(), prefix, overlay) {
+				return nil
+			}
+			overlay.inFlight[scope] = true
+			defer delete(overlay.inFlight, scope)
+			if err := applyEnv(candidate.Elem(), prefix, path, overlay); err != nil {
 				return err
 			}
 			value.Set(candidate)
 			return nil
 		}
-		return applyEnv(value.Elem(), prefix, path, vars)
+		return applyEnv(value.Elem(), prefix, path, overlay)
 	case reflect.Map:
 		if value.IsNil() {
 			return nil
@@ -149,14 +197,14 @@ func applyEnv(value reflect.Value, prefix, path string, vars map[string]string) 
 				mapPrefix = mapKey
 			}
 			mapPath := fmt.Sprintf("%s[%v]", path, key.Interface())
-			if err := applyEnv(mapValue, mapPrefix, mapPath, vars); err != nil {
+			if err := applyEnv(mapValue, mapPrefix, mapPath, overlay); err != nil {
 				return err
 			}
 			value.SetMapIndex(key, mapValue)
 		}
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < value.Len(); i++ {
-			if err := applyEnv(value.Index(i), prefix, fmt.Sprintf("%s[%d]", path, i), vars); err != nil {
+			if err := applyEnv(value.Index(i), prefix, fmt.Sprintf("%s[%d]", path, i), overlay); err != nil {
 				return err
 			}
 		}
@@ -204,7 +252,7 @@ func setEnvValue(field reflect.Value, raw string) error {
 	return nil
 }
 
-func containsEnvValue(value reflect.Value, prefix string, vars map[string]string) bool {
+func containsEnvValue(value reflect.Value, prefix string, overlay *envOverlay) bool {
 	switch value.Kind() {
 	case reflect.Struct:
 		for i := 0; i < value.NumField(); i++ {
@@ -221,19 +269,19 @@ func containsEnvValue(value reflect.Value, prefix string, vars map[string]string
 				key = prefix + "_" + key
 			}
 			if key != "" {
-				if _, ok := lookupEnv(key, vars); ok {
+				if _, ok := lookupEnv(key, overlay.vars); ok {
 					return true
 				}
 			}
-			if containsEnvValue(value.Field(i), prefix, vars) {
+			if containsEnvValue(value.Field(i), prefix, overlay) {
 				return true
 			}
 		}
 	case reflect.Pointer:
 		if value.IsNil() {
-			return containsEnvType(value.Type().Elem(), prefix, vars)
+			return containsEnvType(value.Type().Elem(), prefix, overlay)
 		}
-		return containsEnvValue(value.Elem(), prefix, vars)
+		return containsEnvValue(value.Elem(), prefix, overlay)
 	case reflect.Map:
 		iter := value.MapRange()
 		for iter.Next() {
@@ -246,13 +294,13 @@ func containsEnvValue(value reflect.Value, prefix string, vars map[string]string
 				}
 				mapPrefix = mapKey
 			}
-			if containsEnvValue(iter.Value(), mapPrefix, vars) {
+			if containsEnvValue(iter.Value(), mapPrefix, overlay) {
 				return true
 			}
 		}
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < value.Len(); i++ {
-			if containsEnvValue(value.Index(i), prefix, vars) {
+			if containsEnvValue(value.Index(i), prefix, overlay) {
 				return true
 			}
 		}
@@ -260,7 +308,17 @@ func containsEnvValue(value reflect.Value, prefix string, vars map[string]string
 	return false
 }
 
-func containsEnvType(typ reflect.Type, prefix string, vars map[string]string) bool {
+func containsEnvType(typ reflect.Type, prefix string, overlay *envOverlay) bool {
+	// A recursive destination type reaches itself again through the pointer
+	// case below. Stop when the path loops back to a scope already being
+	// scanned: its fields were searched for this prefix on the first visit.
+	scope := envScope{typ: typ, prefix: prefix}
+	proceed, leave := overlay.enter(scope)
+	if !proceed {
+		return false
+	}
+	defer leave()
+
 	switch typ.Kind() {
 	case reflect.Struct:
 		for i := 0; i < typ.NumField(); i++ {
@@ -277,16 +335,16 @@ func containsEnvType(typ reflect.Type, prefix string, vars map[string]string) bo
 				key = prefix + "_" + key
 			}
 			if key != "" {
-				if _, ok := lookupEnv(key, vars); ok {
+				if _, ok := lookupEnv(key, overlay.vars); ok {
 					return true
 				}
 			}
-			if containsEnvType(field.Type, prefix, vars) {
+			if containsEnvType(field.Type, prefix, overlay) {
 				return true
 			}
 		}
 	case reflect.Pointer:
-		return containsEnvType(typ.Elem(), prefix, vars)
+		return containsEnvType(typ.Elem(), prefix, overlay)
 	}
 	return false
 }
