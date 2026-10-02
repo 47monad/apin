@@ -207,6 +207,10 @@ pginitr.New(ctx,
 The loader reads `.env` values without changing the process environment.
 Precedence is process environment > `.env` file > configuration file.
 
+A nil pointer field is materialized only when an environment value exists
+beneath it, and a self-referential type is materialized at most once per
+scope, so a recursive configuration type cannot grow an unbounded chain.
+
 An initializer can also be configured entirely through options.
 
 ## Repository Layout

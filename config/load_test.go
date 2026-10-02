@@ -31,6 +31,14 @@ type pointerIntConfig struct {
 	Timeout *int `json:"timeout" yaml:"timeout" env:"test_timeout"`
 }
 
+// recursiveConfig reaches itself through a pointer, which the overlay must
+// handle without materializing an unbounded chain of instances.
+type recursiveConfig struct {
+	Name string            `json:"name" yaml:"name" env:"rec_name"`
+	Next *recursiveConfig  `json:"next" yaml:"next" env:"rec_next"`
+	Kids []recursiveConfig `json:"kids" yaml:"kids" env:"rec_kids"`
+}
+
 func writeFile(t *testing.T, name, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name)
@@ -177,6 +185,96 @@ func TestLoadAppliesEnvironmentToOptionalScalarPointer(t *testing.T) {
 	}
 	if destination.Timeout == nil || *destination.Timeout != 8 {
 		t.Fatalf("Load() timeout = %v, want dotenv value 8", destination.Timeout)
+	}
+}
+
+// A recursive destination type must not send the overlay into unbounded
+// recursion. Without a guard this overflows the stack in containsEnvType even
+// with no environment at all, so the case has to terminate rather than crash.
+func TestLoadRecursiveTypeWithoutEnvironmentTerminates(t *testing.T) {
+	configPath := writeFile(t, "app.json", `{}`)
+	var got recursiveConfig
+	if err := config.Load(configPath, "", &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Next != nil {
+		t.Errorf("Load() materialized Next = %+v, want nil without an environment value", got.Next)
+	}
+	if len(got.Kids) != 0 {
+		t.Errorf("Load() populated Kids = %+v, want empty", got.Kids)
+	}
+}
+
+// A matching environment value justifies exactly one materialized instance,
+// not an endless chain of them.
+func TestLoadRecursiveTypeMaterializesOnlyOneInstance(t *testing.T) {
+	t.Setenv("REC_NAME", "from-env")
+	configPath := writeFile(t, "app.json", `{}`)
+	var got recursiveConfig
+	if err := config.Load(configPath, "", &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Name != "from-env" {
+		t.Errorf("Load() name = %q, want from-env", got.Name)
+	}
+	if got.Next == nil || got.Next.Name != "from-env" {
+		t.Fatalf("Load() next = %+v, want one instance with name from-env", got.Next)
+	}
+	if got.Next.Next != nil {
+		t.Errorf("Load() chained a second instance: %+v", got.Next.Next)
+	}
+}
+
+// Recursive values that the file already supplied stay finite and still receive
+// their overlays; only materializing new ones is bounded.
+func TestLoadRecursiveTypeOverlaysExistingChain(t *testing.T) {
+	t.Setenv("REC_NAME", "overlaid")
+	configPath := writeFile(t, "app.json", `{"next":{"next":{"name":"deep"}}}`)
+
+	var got recursiveConfig
+	if err := config.Load(configPath, "", &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	depth := 0
+	for node := &got; node != nil; node = node.Next {
+		depth++
+		if depth > 8 {
+			t.Fatalf("Load() produced a chain longer than the file supplied: %+v", got)
+		}
+		if node.Name != "overlaid" {
+			t.Errorf("node %d name = %q, want overlaid", depth, node.Name)
+		}
+	}
+	// The file supplies three nodes; the matching environment value justifies
+	// one more at the tail, and the chain stops there.
+	if depth != 4 {
+		t.Errorf("chain length = %d, want 3 file nodes plus 1 materialized", depth)
+	}
+}
+
+// Each map key puts the same recursive type under a different environment
+// prefix, so both entries are materialized independently. This is what keeps
+// the guard from simply blocking a repeated type.
+func TestLoadRecursiveTypeUnderDistinctMapKeys(t *testing.T) {
+	t.Setenv("PRIMARY_REC_NAME", "from-primary")
+	t.Setenv("SECONDARY_REC_NAME", "from-secondary")
+	configPath := writeFile(t, "app.json", `{"peers":{"primary":{},"secondary":{}}}`)
+
+	var got struct {
+		Peers map[string]recursiveConfig `json:"peers" yaml:"peers"`
+	}
+	if err := config.Load(configPath, "", &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Peers["primary"].Name != "from-primary" {
+		t.Errorf("peers[primary].name = %q, want from-primary", got.Peers["primary"].Name)
+	}
+	if got.Peers["secondary"].Name != "from-secondary" {
+		t.Errorf("peers[secondary].name = %q, want from-secondary", got.Peers["secondary"].Name)
+	}
+	if len(got.Peers) != 2 {
+		t.Errorf("peers = %+v, want both entries", got.Peers)
 	}
 }
 
