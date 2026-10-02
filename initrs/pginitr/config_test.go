@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/47monad/apin/initrs/pginitr"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -110,6 +111,50 @@ func TestConfigDSNURIAndDefaults(t *testing.T) {
 				t.Errorf("DSN() error = %v, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestConfigDSNHostComposition(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  pginitr.Config
+		want string
+	}{
+		{name: "ipv4", cfg: pginitr.Config{Host: "127.0.0.1", Port: 2231, DBName: "settings"}, want: "postgres://127.0.0.1:2231/settings"},
+		{name: "hostname default port", cfg: pginitr.Config{Host: "localhost", DBName: "settings"}, want: "postgres://localhost:5432/settings"},
+		{name: "ipv6", cfg: pginitr.Config{Host: "fd00::1", DBName: "settings"}, want: "postgres://[fd00::1]:5432/settings"},
+		{name: "ipv6 explicit port", cfg: pginitr.Config{Host: "2001:db8::1", Port: 2231, DBName: "settings"}, want: "postgres://[2001:db8::1]:2231/settings"},
+		{name: "ipv6 loopback", cfg: pginitr.Config{Host: "::1", DBName: "settings"}, want: "postgres://[::1]:5432/settings"},
+		{name: "bracketed ipv6", cfg: pginitr.Config{Host: "[fd00::1]", DBName: "settings"}, want: "postgres://[fd00::1]:5432/settings"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.cfg.DSN()
+			if err != nil {
+				t.Fatalf("DSN() error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("DSN() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// A composed IPv6 DSN has to stay usable by pgx, not merely look right: the
+// port has to survive as a port rather than as part of the address.
+func TestConfigDSNIPv6IsParsableByPGX(t *testing.T) {
+	cfg := &pginitr.Config{Host: "fd00::1", Port: 2231, DBName: "settings"}
+	dsn, err := cfg.DSN()
+	if err != nil {
+		t.Fatalf("DSN() error = %v", err)
+	}
+
+	connConfig, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		t.Fatalf("pgx.ParseConfig(%q) error = %v", dsn, err)
+	}
+	if connConfig.Host != "fd00::1" || connConfig.Port != 2231 || connConfig.Database != "settings" {
+		t.Errorf("pgx config = %s:%d/%s, want fd00::1:2231/settings", connConfig.Host, connConfig.Port, connConfig.Database)
 	}
 }
 

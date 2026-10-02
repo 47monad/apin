@@ -3,8 +3,10 @@ package pginitr
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Config is the PostgreSQL initializer's configuration. Applications may
@@ -24,7 +26,9 @@ type Config struct {
 }
 
 // DSN returns URI when configured, otherwise it composes a URI from the
-// discrete connection fields. The default port is 5432.
+// discrete connection fields. The default port is 5432. An IPv6 host is
+// bracketed exactly once, whether it is written bare (fd00::1) or already
+// bracketed ([fd00::1]).
 func (c *Config) DSN() (string, error) {
 	if c.URI != "" {
 		return c.URI, nil
@@ -41,7 +45,7 @@ func (c *Config) DSN() (string, error) {
 	}
 	u := url.URL{
 		Scheme: "postgres",
-		Host:   fmt.Sprintf("%s:%d", c.Host, port),
+		Host:   net.JoinHostPort(hostForJoin(c.Host), strconv.Itoa(port)),
 		Path:   "/" + c.DBName,
 	}
 	if c.Username != "" {
@@ -61,6 +65,14 @@ func (c *Config) DSN() (string, error) {
 		u.RawQuery = params.Encode()
 	}
 	return u.String(), nil
+}
+
+// hostForJoin strips the brackets from an IPv6 literal, so net.JoinHostPort is
+// the single place that brackets the host. Config accepts either form, which
+// keeps a host copied out of a connection URI working instead of producing
+// doubled brackets.
+func hostForJoin(host string) string {
+	return strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 }
 
 func validateConfig(config *resolvedConfig) error {
