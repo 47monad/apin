@@ -117,7 +117,17 @@ func TestShellDBNotInitialized(t *testing.T) {
 	}
 }
 
-func TestPingHonorsCanceledContext(t *testing.T) {
+func TestShellReadyAndPingNotInitialized(t *testing.T) {
+	shell := &pginitr.Shell{}
+	if err := shell.Ready(context.Background()); err == nil {
+		t.Fatal("Ready() error = nil on uninitialized shell, want error")
+	}
+	if err := shell.Ping(context.Background()); err == nil {
+		t.Fatal("Ping() error = nil on uninitialized shell, want error")
+	}
+}
+
+func TestReadyAndPingHonorCanceledContext(t *testing.T) {
 	shell, err := pginitr.New(context.Background(),
 		pginitr.WithHost("127.0.0.1"),
 		pginitr.WithPort(1),
@@ -130,6 +140,9 @@ func TestPingHonorsCanceledContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
+	if err := shell.Ready(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Ready() error = %v, want context.Canceled", err)
+	}
 	if err := shell.Ping(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Ping() error = %v, want context.Canceled", err)
 	}

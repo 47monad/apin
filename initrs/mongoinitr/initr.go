@@ -81,6 +81,19 @@ func resolveConfig(opts ...Option) (*resolvedConfig, error) {
 	return store, nil
 }
 
+// Ready verifies MongoDB connectivity with a ping. It satisfies
+// apin.ReadinessChecker. Callers can bound the probe by passing a context with
+// a deadline.
+func (shell *Shell) Ready(ctx context.Context) error {
+	if shell.Client == nil {
+		return errors.New("mongoinitr: shell is not initialized")
+	}
+	if err := shell.Client.Ping(ctx, nil); err != nil {
+		return fmt.Errorf("problem pinging database: %w", err)
+	}
+	return nil
+}
+
 func (shell *Shell) Close(ctx context.Context) error {
 	if shell.Client == nil {
 		return nil

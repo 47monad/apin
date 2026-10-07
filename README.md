@@ -97,8 +97,9 @@ func main() {
 A returned shell provides access to its native client. Connectivity is
 initializer-specific: PostgreSQL pool mode and etcd clients are constructed
 lazily, while PostgreSQL single-connection mode connects during `New`. Call
-`pginitr.Shell.Ping` or `etcdinitr.Shell.Ready` with a deadline-bearing
-context when startup must verify reachability. `app.Run` blocks until a
+`shell.Ready(ctx)` — the `apin.ReadinessChecker` contract — with a
+deadline-bearing context when startup must verify reachability; PostgreSQL
+keeps `Ping` as an alias. `app.Run` blocks until a
 runnable fails, the context is cancelled, or SIGINT/SIGTERM — then closes
 every tracked shell in reverse initialization order.
 
@@ -117,8 +118,9 @@ Every initr follows the same contract, so any service reads the same way:
    `New` validates configuration and constructs the native client; connection
    verification is initializer-specific. PostgreSQL pool mode and etcd use
    lazy client construction; PostgreSQL single-connection mode connects
-   eagerly. PostgreSQL exposes `Ping(ctx)` and etcd exposes `Ready(ctx)` for
-   explicit connectivity checks.
+   eagerly. Every shell exposes `Ready(ctx) error` (`apin.ReadinessChecker`)
+   for explicit connectivity checks; PostgreSQL keeps `Ping` as an alias, and
+   RabbitMQ `Ready` reports current state while `WaitForHealth` waits.
 3. **Options.** Functional options (`Option`) are applied in order; later
    options win.
 4. **Config entry point.** Each initializer can accept its own configuration
@@ -144,10 +146,10 @@ Every initr follows the same contract, so any service reads the same way:
 
 | Module | Shell | Notes |
 |---|---|---|
-| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | lazy connectivity; `Ping(ctx)` verifies the active pool or connection; `DB()` gives a mode-independent query surface |
-| [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection |
+| [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | lazy connectivity; `Ready(ctx)` (alias `Ping(ctx)`) verifies the active pool or connection; `DB()` gives a mode-independent query surface |
+| [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection; `Ready(ctx)` pings |
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
-| [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `WaitForHealth` |
+| [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `Ready(ctx)` reports current state, `WaitForHealth` waits |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |

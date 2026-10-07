@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var _ apin.ReadinessChecker = (*pginitr.Shell)(nil)
+
 func TestAppRunShutdownDeadlineWithPostgresPool(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

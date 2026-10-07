@@ -10,6 +10,8 @@ import (
 	"github.com/47monad/apin/initrs/rmqinitr"
 )
 
+var _ apin.ReadinessChecker = (*rmqinitr.Shell)(nil)
+
 func TestAppRunShutdownDeadlineWithRabbitMQReconnect(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
