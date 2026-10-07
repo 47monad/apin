@@ -227,7 +227,6 @@ An initializer can also be configured entirely through options.
 
 - `common.go`, `app.go` — minimal lifecycle module (`App`, `Closer`, `Runnable`)
 - `config/` — JSON/YAML loading and environment overlays, shipped with the root `apin` module
-- `closr/` — the `Closer` alias, kept for compatibility
 - `initrs/` — one module per service initr
 - `examples/` — runnable example services (see `examples/grpcsvc`)
 
