@@ -5,11 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/47monad/apin"
 	"github.com/47monad/apin/config"
 	"github.com/47monad/apin/initrs/mongoinitr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ apin.ReadinessChecker = (*mongoinitr.Shell)(nil)
 
 // unsetEnv removes key for the duration of the test. An explicit empty process
 // value now means an explicit empty configuration, so isolation requires real

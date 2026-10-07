@@ -255,6 +255,21 @@ func (r *Shell) IsHealthy() bool {
 	return r.healthy && !r.closed
 }
 
+// Ready reports whether the RabbitMQ shell is currently healthy. It satisfies
+// apin.ReadinessChecker and returns immediately; use WaitForHealth to wait for
+// the connection to recover.
+func (r *Shell) Ready(_ context.Context) error {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+	if r.closed {
+		return ErrShellClosed
+	}
+	if !r.healthy {
+		return ErrNotHealthy
+	}
+	return nil
+}
+
 func (r *Shell) GetChannel() (*amqp.Channel, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()

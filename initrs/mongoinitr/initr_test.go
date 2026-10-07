@@ -7,7 +7,33 @@ import (
 	"time"
 
 	"github.com/47monad/apin/initrs/mongoinitr"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+func TestReadyNotInitialized(t *testing.T) {
+	shell := &mongoinitr.Shell{}
+	if err := shell.Ready(context.Background()); err == nil {
+		t.Fatal("Ready() error = nil on uninitialized shell, want error")
+	}
+}
+
+func TestReadyReportsUnreachableServer(t *testing.T) {
+	client, err := mongo.Connect(options.Client().ApplyURI(
+		"mongodb://127.0.0.1:65534/?connect=direct&serverSelectionTimeoutMS=50",
+	))
+	if err != nil {
+		t.Fatalf("mongo.Connect() error = %v", err)
+	}
+	defer func() { _ = client.Disconnect(context.Background()) }()
+
+	shell := &mongoinitr.Shell{Client: client}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := shell.Ready(ctx); err == nil {
+		t.Fatal("Ready() error = nil for an unreachable server, want error")
+	}
+}
 
 func TestErrorWrapping(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)

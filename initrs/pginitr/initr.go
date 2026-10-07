@@ -176,9 +176,10 @@ func (shell *Shell) DB() (Querier, error) {
 	return nil, fmt.Errorf("pginitr: shell is not initialized")
 }
 
-// Ping verifies PostgreSQL connectivity using the shell's active connection
-// mode. Callers can bound the probe by passing a context with a deadline.
-func (shell *Shell) Ping(ctx context.Context) error {
+// Ready verifies PostgreSQL connectivity using the shell's active connection
+// mode. It satisfies apin.ReadinessChecker. Callers can bound the probe by
+// passing a context with a deadline.
+func (shell *Shell) Ready(ctx context.Context) error {
 	if shell.Conn != nil {
 		return shell.Conn.Ping(ctx)
 	}
@@ -186,6 +187,12 @@ func (shell *Shell) Ping(ctx context.Context) error {
 		return shell.Pool.Ping(ctx)
 	}
 	return fmt.Errorf("pginitr: shell is not initialized")
+}
+
+// Ping is an alias for Ready retained for callers written before the standard
+// readiness contract.
+func (shell *Shell) Ping(ctx context.Context) error {
+	return shell.Ready(ctx)
 }
 
 // Close releases the underlying connection or pool.
