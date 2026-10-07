@@ -156,6 +156,9 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/promgrpcinitr`](initrs/promgrpcinitr) | `Shell{UnaryInterceptor, StreamInterceptor, ServerMetrics}` | optional gRPC server instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
 
+See the [v0.2.0 migration guide](docs/migration/v0.2.0.md) for breaking changes,
+the new initrs, and the release checklist.
+
 ## Graceful Shutdown
 
 `apin.App` owns the shutdown:
