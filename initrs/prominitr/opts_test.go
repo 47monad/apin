@@ -1,58 +1,68 @@
 package prominitr_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/47monad/apin/initrs/prominitr"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func TestNewConfigurationAndOptionPrecedence(t *testing.T) {
-	defaultShell, err := prominitr.New(t.Context())
+func hasMetricPrefix(t *testing.T, registry *prometheus.Registry, prefix string) bool {
+	t.Helper()
+	families, err := registry.Gather()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if defaultShell.GRPCServerInterceptor != nil || defaultShell.GRPCServerMetrics != nil {
-		t.Fatal("gRPC metrics are enabled by default")
+	for _, family := range families {
+		if strings.HasPrefix(family.GetName(), prefix) {
+			return true
+		}
 	}
-	if defaultShell.Registry == nil {
+	return false
+}
+
+func TestCollectorsAreOptIn(t *testing.T) {
+	shell, err := prominitr.New(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shell.Registry == nil {
 		t.Fatal("New returned a nil registry")
 	}
+	if hasMetricPrefix(t, shell.Registry, "go_") {
+		t.Fatal("Go collector is enabled by default")
+	}
+	if hasMetricPrefix(t, shell.Registry, "process_") {
+		t.Fatal("process collector is enabled by default")
+	}
+}
 
-	configuredShell, err := prominitr.New(t.Context(), prominitr.WithConfig(&prominitr.Config{GRPCMetrics: true}))
+func TestConfigAndOptionPrecedence(t *testing.T) {
+	configured, err := prominitr.New(t.Context(), prominitr.WithConfig(&prominitr.Config{GoCollector: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if configuredShell.GRPCServerInterceptor == nil || configuredShell.GRPCServerMetrics == nil {
-		t.Fatal("WithConfig did not enable gRPC instrumentation")
+	if !hasMetricPrefix(t, configured.Registry, "go_") {
+		t.Fatal("WithConfig did not enable the Go collector")
 	}
 
-	overriddenShell, err := prominitr.New(t.Context(),
-		prominitr.WithConfig(&prominitr.Config{GRPCMetrics: true}),
-		prominitr.WithGRPCMetrics(false),
+	overridden, err := prominitr.New(t.Context(),
+		prominitr.WithConfig(&prominitr.Config{GoCollector: true}),
+		prominitr.WithGoCollector(false),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if overriddenShell.GRPCServerInterceptor != nil || overriddenShell.GRPCServerMetrics != nil {
-		t.Fatal("later WithGRPCMetrics(false) did not override Config")
+	if hasMetricPrefix(t, overridden.Registry, "go_") {
+		t.Fatal("later WithGoCollector(false) did not override Config")
 	}
 
-	enabledShell, err := prominitr.New(t.Context(), prominitr.WithGRPCMetrics(true))
+	process, err := prominitr.New(t.Context(), prominitr.WithProcessCollector(true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if enabledShell.GRPCServerInterceptor == nil || enabledShell.GRPCServerMetrics == nil {
-		t.Fatal("WithGRPCMetrics(true) did not provide gRPC instrumentation")
-	}
-}
-
-func TestWithPromMonitoring(t *testing.T) {
-	interceptor, metrics := prominitr.WithPromMonitoring(prometheus.NewRegistry())
-	if interceptor == nil {
-		t.Fatal("WithPromMonitoring returned a nil interceptor")
-	}
-	if metrics == nil {
-		t.Fatal("WithPromMonitoring returned nil metrics")
+	if !hasMetricPrefix(t, process.Registry, "process_") {
+		t.Fatal("WithProcessCollector(true) did not register process metrics")
 	}
 }

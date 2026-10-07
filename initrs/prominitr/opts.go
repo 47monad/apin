@@ -4,12 +4,14 @@ import "errors"
 
 // Config contains Prometheus settings owned by prominitr.
 type Config struct {
-	GRPCMetrics bool `json:"grpcMetrics" yaml:"grpcMetrics" env:"prometheus_grpc_metrics"`
+	GoCollector      bool `json:"goCollector" yaml:"goCollector" env:"prometheus_go_collector"`
+	ProcessCollector bool `json:"processCollector" yaml:"processCollector" env:"prometheus_process_collector"`
 }
 
 // resolvedConfig is private construction state owned by prominitr.
 type resolvedConfig struct {
-	grpcMetrics bool
+	goCollector      bool
+	processCollector bool
 }
 
 // Option is a sealed functional option accepted by New.
@@ -30,15 +32,24 @@ func WithConfig(config *Config) Option {
 		if config == nil {
 			return nil
 		}
-		s.grpcMetrics = config.GRPCMetrics
+		s.goCollector = config.GoCollector
+		s.processCollector = config.ProcessCollector
 		return nil
 	})
 }
 
-// WithGRPCMetrics enables or disables exposing gRPC server metrics.
-func WithGRPCMetrics(enabled bool) Option {
+// WithGoCollector registers the standard Go runtime collectors.
+func WithGoCollector(enabled bool) Option {
 	return optionFunc(func(s *resolvedConfig) error {
-		s.grpcMetrics = enabled
+		s.goCollector = enabled
+		return nil
+	})
+}
+
+// WithProcessCollector registers the standard process collectors.
+func WithProcessCollector(enabled bool) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		s.processCollector = enabled
 		return nil
 	})
 }

@@ -34,14 +34,14 @@ type serviceConfig struct {
 
 func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 	t.Run("JSON file then dotenv then process environment", func(t *testing.T) {
-		t.Setenv("PROMETHEUS_GRPC_METRICS", "false")
+		t.Setenv("PROMETHEUS_GO_COLLECTOR", "false")
 		root := t.TempDir()
 		configPath := filepath.Join(root, "service.json")
 		envPath := filepath.Join(root, ".env")
-		if err := os.WriteFile(configPath, []byte(`{"name":"json","prometheus":{"grpcMetrics":false}}`), 0o600); err != nil {
+		if err := os.WriteFile(configPath, []byte(`{"name":"json","prometheus":{"goCollector":false}}`), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(envPath, []byte("PROMETHEUS_GRPC_METRICS=true\n"), 0o600); err != nil {
+		if err := os.WriteFile(envPath, []byte("PROMETHEUS_GO_COLLECTOR=true\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -49,20 +49,20 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		if err := config.Load(configPath, envPath, &cfg); err != nil {
 			t.Fatal(err)
 		}
-		if cfg.Name != "json" || cfg.Prometheus == nil || cfg.Prometheus.GRPCMetrics {
+		if cfg.Name != "json" || cfg.Prometheus == nil || cfg.Prometheus.GoCollector {
 			t.Fatalf("unexpected process-environment overlay: %#v", cfg)
 		}
 	})
 
 	t.Run("dotenv overrides YAML file", func(t *testing.T) {
-		unsetEnv(t, "PROMETHEUS_GRPC_METRICS")
+		unsetEnv(t, "PROMETHEUS_GO_COLLECTOR")
 		root := t.TempDir()
 		configPath := filepath.Join(root, "service.yaml")
 		envPath := filepath.Join(root, ".env")
-		if err := os.WriteFile(configPath, []byte("name: yaml\nprometheus:\n  grpcMetrics: false\n"), 0o600); err != nil {
+		if err := os.WriteFile(configPath, []byte("name: yaml\nprometheus:\n  goCollector: false\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(envPath, []byte("PROMETHEUS_GRPC_METRICS=true\n"), 0o600); err != nil {
+		if err := os.WriteFile(envPath, []byte("PROMETHEUS_GO_COLLECTOR=true\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -70,7 +70,7 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 		if err := config.Load(configPath, envPath, &cfg); err != nil {
 			t.Fatal(err)
 		}
-		if cfg.Name != "yaml" || cfg.Prometheus == nil || !cfg.Prometheus.GRPCMetrics {
+		if cfg.Name != "yaml" || cfg.Prometheus == nil || !cfg.Prometheus.GoCollector {
 			t.Fatalf("unexpected dotenv overlay: %#v", cfg)
 		}
 	})

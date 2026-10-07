@@ -2,7 +2,10 @@
 
 Prometheus initr. Returns a shell with a fresh
 [`prometheus.Registry`](https://pkg.go.dev/github.com/prometheus/client_golang/prometheus#Registry)
-for the service's metrics — instead of the global default registry.
+for the service's metrics — instead of the global default registry. gRPC
+instrumentation lives in the separate
+[`promgrpcinitr`](../promgrpcinitr) module, so this module carries no gRPC or
+OpenTelemetry dependencies.
 
 ```bash
 go get github.com/47monad/apin/initrs/prominitr
@@ -30,9 +33,7 @@ promShell, err := prominitr.New(ctx)
 
 ```go
 type Shell struct {
-	Registry               *prometheus.Registry
-	GRPCServerInterceptor grpc.UnaryServerInterceptor
-	GRPCServerMetrics     *grpcprom.ServerMetrics
+	Registry *prometheus.Registry
 }
 ```
 
@@ -44,15 +45,11 @@ handler (`promhttp.HandlerFor(shell.Registry, ...)`).
 | Option | Description |
 |---|---|
 | `WithConfig(*prominitr.Config)` | apply an initializer-owned config section |
-| `WithGRPCMetrics(bool)` | enable/disable gRPC metrics configuration |
+| `WithGoCollector(bool)` | register the standard Go runtime collectors |
+| `WithProcessCollector(bool)` | register the standard process collectors |
 
-`Config` contains the optional `GRPCMetrics` toggle. When enabled, the shell
-registers gRPC metrics in its registry and exposes both the unary interceptor
-and native `*grpcprom.ServerMetrics` handle. Applications can pass the
-interceptor to the selected gRPC server initializer with
-`grpcinitr.WithInterceptor`; `prominitr` itself does not depend on `grpcinitr`.
-`WithPromMonitoring(reg)` remains available for applications that need to
-attach instrumentation to another registry.
+`Config` contains optional `GoCollector` and `ProcessCollector` toggles; both
+default to off. Later options override config values.
 
 Options are sealed: callers can compose the named options but cannot mutate
 prominitr's private construction state.
@@ -61,3 +58,4 @@ prominitr's private construction state.
 
 `Close(ctx)` is a no-op because the shell holds no external resources. Its
 context-aware close method lets applications use their own lifecycle policy.
+Implementing `apin.Closer`, it slots directly into `apin.App.Track`.

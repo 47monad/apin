@@ -151,7 +151,8 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection; caller-owned channels via `NewChannel`; `Ready(ctx)` reports current state, `WaitForHealth` waits |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
-| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
+| [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry}` | private Prometheus registry; optional Go/process collectors |
+| [`initrs/promgrpcinitr`](initrs/promgrpcinitr) | `Shell{UnaryInterceptor, StreamInterceptor, ServerMetrics}` | optional gRPC server instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
 
 ## Graceful Shutdown

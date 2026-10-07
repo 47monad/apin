@@ -71,6 +71,7 @@ type ServerShell struct {
 | `WithHealthCheck(enabled bool)` | register the standard gRPC health checking service |
 | `WithRunnable(fn func(*grpc.Server))` | bootstrap logic run against the created server — where services get registered |
 | `WithInterceptor(i grpc.UnaryServerInterceptor)` | append a unary interceptor (repeatable) |
+| `WithStreamInterceptor(i grpc.StreamServerInterceptor)` | append a stream interceptor (repeatable) |
 | `WithServerOptions(options ...grpc.ServerOption)` | pass native gRPC server options |
 
 ## Configuration
