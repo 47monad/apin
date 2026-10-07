@@ -158,6 +158,49 @@ func TestConfigDSNIPv6IsParsableByPGX(t *testing.T) {
 	}
 }
 
+// New and Config.DSN must resolve through the same logic: the connection the
+// constructor builds has to match the DSN the public method reports.
+func TestConfigDSNAgreesWithNew(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		cfg  pginitr.Config
+	}{
+		{name: "ipv4 explicit port", cfg: pginitr.Config{Host: "127.0.0.1", Port: 2231, DBName: "settings"}},
+		{name: "ipv4 default port", cfg: pginitr.Config{Host: "localhost", DBName: "settings"}},
+		{name: "ipv6 default port", cfg: pginitr.Config{Host: "fd00::1", DBName: "settings"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			want, err := cfg.DSN()
+			if err != nil {
+				t.Fatalf("DSN() error = %v", err)
+			}
+			parsed, err := pgx.ParseConfig(want)
+			if err != nil {
+				t.Fatalf("pgx.ParseConfig(%q) error = %v", want, err)
+			}
+
+			stop := errors.New("stop before connect")
+			var captured *pgxpool.Config
+			_, err = pginitr.New(context.Background(),
+				pginitr.WithConfig(&cfg),
+				pginitr.WithNativePoolConfig(func(config *pgxpool.Config) error {
+					captured = config
+					return stop
+				}),
+			)
+			if !errors.Is(err, stop) {
+				t.Fatalf("New() error = %v, want native configuration sentinel", err)
+			}
+			got := captured.ConnConfig
+			if got.Host != parsed.Host || got.Port != parsed.Port || got.Database != parsed.Database {
+				t.Errorf("New resolved %s:%d/%s, DSN resolved %s:%d/%s",
+					got.Host, got.Port, got.Database, parsed.Host, parsed.Port, parsed.Database)
+			}
+		})
+	}
+}
+
 func TestConfigValidationErrorOrder(t *testing.T) {
 	_, err := pginitr.New(context.Background(), pginitr.WithConfig(&pginitr.Config{
 		Host: "localhost",
