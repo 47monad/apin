@@ -8,9 +8,14 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 )
 
-const defaultPort = 4747
+const (
+	defaultPort              = 4747
+	defaultReadHeaderTimeout = 10 * time.Second
+	defaultIdleTimeout       = 120 * time.Second
+)
 
 // ServerShell exposes the native HTTP server and context-aware serving.
 type ServerShell struct {
@@ -28,15 +33,20 @@ func (shell *ServerShell) Listen() (net.Listener, error) {
 		return nil, errors.New("httpinitr: cannot listen with a nil server")
 	}
 	shell.mu.Lock()
-	defer shell.mu.Unlock()
-	if shell.closed {
+	closed := shell.closed
+	shell.mu.Unlock()
+	if closed {
 		return nil, errors.New("httpinitr: cannot listen after close")
 	}
+
 	listener, err := net.Listen("tcp", shell.Server.Addr)
 	if err != nil {
 		return nil, err
 	}
-	shell.listeners = append(shell.listeners, listener)
+	if err := shell.trackListener(listener); err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
 	return listener, nil
 }
 
@@ -82,12 +92,60 @@ func newServer(config *resolvedConfig) (*ServerShell, error) {
 	if config.handler == nil {
 		config.handler = http.NewServeMux()
 	}
+	if err := validateTimeouts(config); err != nil {
+		return nil, err
+	}
 
 	server := &http.Server{
-		Addr:    net.JoinHostPort("", strconv.Itoa(config.port)),
-		Handler: config.handler,
+		Addr:              net.JoinHostPort(config.host, strconv.Itoa(config.port)),
+		Handler:           config.handler,
+		ReadHeaderTimeout: durationOrDefault(config.readHeaderTimeout, defaultReadHeaderTimeout),
+		ReadTimeout:       durationOrDefault(config.readTimeout, 0),
+		WriteTimeout:      durationOrDefault(config.writeTimeout, 0),
+		IdleTimeout:       durationOrDefault(config.idleTimeout, defaultIdleTimeout),
+		MaxHeaderBytes:    maxHeaderBytesOrDefault(config.maxHeaderBytes),
+		BaseContext:       config.baseContext,
+	}
+	for _, configure := range config.serverOptions {
+		if err := configure(server); err != nil {
+			return nil, fmt.Errorf("httpinitr: native server config: %w", err)
+		}
 	}
 	return &ServerShell{Server: server}, nil
+}
+
+func validateTimeouts(config *resolvedConfig) error {
+	for _, field := range []struct {
+		name    string
+		timeout *time.Duration
+	}{
+		{name: "readHeaderTimeout", timeout: config.readHeaderTimeout},
+		{name: "readTimeout", timeout: config.readTimeout},
+		{name: "writeTimeout", timeout: config.writeTimeout},
+		{name: "idleTimeout", timeout: config.idleTimeout},
+	} {
+		if field.timeout != nil && *field.timeout < 0 {
+			return fmt.Errorf("httpinitr: %s must not be negative", field.name)
+		}
+	}
+	if config.maxHeaderBytes < 0 {
+		return fmt.Errorf("httpinitr: maxHeaderBytes must not be negative")
+	}
+	return nil
+}
+
+func durationOrDefault(timeout *time.Duration, fallback time.Duration) time.Duration {
+	if timeout == nil {
+		return fallback
+	}
+	return *timeout
+}
+
+func maxHeaderBytesOrDefault(bytes int) int {
+	if bytes == 0 {
+		return http.DefaultMaxHeaderBytes
+	}
+	return bytes
 }
 
 // Serve serves on listener until the context ends or the server fails. The
@@ -136,6 +194,13 @@ func (shell *ServerShell) trackListener(listener net.Listener) error {
 	defer shell.mu.Unlock()
 	if shell.closed {
 		return errors.New("httpinitr: cannot serve after close")
+	}
+	// Listen records its listener so Close can release it before Serve starts;
+	// Serve then sees the same listener and must not record it twice.
+	for _, existing := range shell.listeners {
+		if existing == listener {
+			return nil
+		}
 	}
 	shell.listeners = append(shell.listeners, listener)
 	return nil
