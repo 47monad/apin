@@ -3,19 +3,20 @@ package etcdinitr
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // Config contains etcd connection settings owned by etcdinitr.
-// Timeout is optional, expressed in seconds, and must be positive when set.
+// Endpoints holds one or more etcd endpoints and must not be empty when the
+// shell is constructed. Timeout is optional, expressed in seconds, and must be
+// positive when set.
 type Config struct {
-	Endpoints string `json:"endpoints" yaml:"endpoints" env:"etcd_endpoints"`
-	Username  string `json:"username" yaml:"username" env:"etcd_username"`
-	Password  string `json:"password" yaml:"password" env:"etcd_password"`
-	Timeout   *int   `json:"timeout,omitempty" yaml:"timeout,omitempty" env:"etcd_timeout"`
+	Endpoints []string `json:"endpoints" yaml:"endpoints" env:"etcd_endpoints"`
+	Username  string   `json:"username" yaml:"username" env:"etcd_username"`
+	Password  string   `json:"password" yaml:"password" env:"etcd_password"`
+	Timeout   *int     `json:"timeout,omitempty" yaml:"timeout,omitempty" env:"etcd_timeout"`
 }
 
 // resolvedConfig is private construction state owned by etcdinitr.
@@ -42,7 +43,7 @@ func WithConfig(config *Config) Option {
 		if config == nil {
 			return nil
 		}
-		opts := []Option{WithEndpoints(strings.Split(config.Endpoints, ","))}
+		opts := []Option{WithEndpoints(config.Endpoints)}
 		if config.Username != "" {
 			opts = append(opts, WithUsername(config.Username))
 		}
@@ -64,10 +65,11 @@ func WithConfig(config *Config) Option {
 	})
 }
 
-// WithEndpoints sets the etcd endpoints.
+// WithEndpoints sets the etcd endpoints. The caller's slice is copied before
+// it is stored, so later mutations do not affect the shell.
 func WithEndpoints(endpoints []string) Option {
 	return optionFunc(func(s *resolvedConfig) error {
-		s.opts.Endpoints = endpoints
+		s.opts.Endpoints = append([]string(nil), endpoints...)
 		return nil
 	})
 }
