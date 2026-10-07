@@ -53,13 +53,12 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	}
 
 	if !config.lazyConnect {
-		conn, ch, err := shell.tryConnect(ctx)
+		conn, err := shell.tryConnect(ctx)
 		if err != nil {
 			cancelWorker()
 			return nil, err
 		}
 		shell.conn = conn
-		shell.channel = ch
 		shell.setHealth(true)
 	}
 

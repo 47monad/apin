@@ -19,7 +19,6 @@ var (
 
 type Shell struct {
 	conn     *amqp.Connection
-	channel  *amqp.Channel
 	lock     sync.RWMutex
 	healthy  bool
 	closed   bool
@@ -42,10 +41,10 @@ func (r *Shell) reconnectLoop() {
 	// A synchronous initial connection may already be established; monitor it
 	// until it drops, then fall through to the reconnect loop.
 	r.lock.RLock()
-	initialConn, initialChan := r.conn, r.channel
+	initialConn := r.conn
 	r.lock.RUnlock()
 	if initialConn != nil {
-		r.waitForClose(initialConn, initialChan)
+		r.waitForClose(initialConn)
 		r.cleanupResources()
 		r.setHealth(false)
 		r.logger.Info("connection lost, attempting to reconnect...")
@@ -58,7 +57,7 @@ func (r *Shell) reconnectLoop() {
 		case <-r.stopChan:
 			return
 		default:
-			conn, ch, err := r.tryConnect(r.workerCtx)
+			conn, err := r.tryConnect(r.workerCtx)
 			if err != nil {
 				r.logger.Error(err, "rabbitmq reconnect failed")
 				r.setHealth(false)
@@ -78,14 +77,14 @@ func (r *Shell) reconnectLoop() {
 
 			r.lock.Lock()
 			r.conn = conn
-			r.channel = ch
 			r.lock.Unlock()
 
 			r.setHealth(true)
 			r.logger.Info("rabbitmq connected successfully")
 
-			// Wait for connection or channel to close
-			r.waitForClose(conn, ch)
+			// Wait for the connection to close. Channels are caller-owned, so
+			// their lifecycle never drives reconnection.
+			r.waitForClose(conn)
 
 			// Clean up resources safely
 			r.cleanupResources()
@@ -95,14 +94,14 @@ func (r *Shell) reconnectLoop() {
 	}
 }
 
-func (r *Shell) tryConnect(ctx context.Context) (*amqp.Connection, *amqp.Channel, error) {
+func (r *Shell) tryConnect(ctx context.Context) (*amqp.Connection, error) {
 	dialConfig := amqp.Config{Locale: "en_US"}
 	if r.config.dialConfig != nil {
 		dialConfig = *r.config.dialConfig
 	}
 	uri, err := amqp.ParseURI(r.config.uri)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse URI: %w", err)
+		return nil, fmt.Errorf("failed to parse URI: %w", err)
 	}
 	connectionTimeout := 30 * time.Second
 	if uri.ConnectionTimeout > 0 {
@@ -134,16 +133,10 @@ func (r *Shell) tryConnect(ctx context.Context) (*amqp.Connection, *amqp.Channel
 
 	conn, err := amqp.DialConfig(r.config.uri, dialConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial: %w", err)
+		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		_ = conn.Close()
-		return nil, nil, fmt.Errorf("failed to create channel: %w", err)
-	}
-
-	return conn, ch, nil
+	return conn, nil
 }
 
 // dialWithContext bounds a caller-provided native dial function, whose API
@@ -203,21 +196,18 @@ func (r *Shell) nextRetryInterval(current time.Duration) time.Duration {
 	return next
 }
 
-func (r *Shell) waitForClose(conn *amqp.Connection, ch *amqp.Channel) {
+// waitForClose blocks until the connection closes or the shell stops. It
+// watches the connection only: channels are caller-owned, so closing one must
+// never trigger a reconnect.
+func (r *Shell) waitForClose(conn *amqp.Connection) {
 	connClosed := make(chan *amqp.Error, 1)
-	chClosed := make(chan *amqp.Error, 1)
 
 	conn.NotifyClose(connClosed)
-	ch.NotifyClose(chClosed)
 
 	select {
 	case err := <-connClosed:
 		if err != nil {
 			r.logger.Error(fmt.Errorf("%v", err), "rabbitmq connection closed")
-		}
-	case err := <-chClosed:
-		if err != nil {
-			r.logger.Error(fmt.Errorf("%v", err), "rabbitmq channel closed")
 		}
 	case <-r.stopChan:
 		return
@@ -228,15 +218,8 @@ func (r *Shell) cleanupResources() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	if r.channel != nil {
-		if err := r.channel.Close(); err != nil {
-			r.logger.Error(err, "error closing channel")
-		}
-		r.channel = nil
-	}
-
 	if r.conn != nil {
-		if err := r.conn.Close(); err != nil {
+		if err := r.conn.Close(); err != nil && !errors.Is(err, amqp.ErrClosed) {
 			r.logger.Error(err, "error closing connection")
 		}
 		r.conn = nil
@@ -270,19 +253,28 @@ func (r *Shell) Ready(_ context.Context) error {
 	return nil
 }
 
-func (r *Shell) GetChannel() (*amqp.Channel, error) {
+// NewChannel opens a caller-owned channel on the current connection. The
+// caller must close it. Closing it does not affect the shell's health and never
+// triggers a reconnect.
+func (r *Shell) NewChannel() (*amqp.Channel, error) {
 	r.lock.RLock()
-	defer r.lock.RUnlock()
+	conn := r.conn
+	healthy := r.healthy
+	closed := r.closed
+	r.lock.RUnlock()
 
-	if r.closed {
+	if closed {
 		return nil, ErrShellClosed
 	}
-
-	if !r.healthy || r.channel == nil {
+	if !healthy || conn == nil {
 		return nil, ErrNotHealthy
 	}
 
-	return r.channel, nil
+	ch, err := conn.Channel()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open channel: %w", err)
+	}
+	return ch, nil
 }
 
 func (r *Shell) GetConn() (*amqp.Connection, error) {

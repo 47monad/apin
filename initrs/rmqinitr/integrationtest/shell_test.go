@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/47monad/apin/initrs/rmqinitr"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -131,7 +133,7 @@ func TestNewRabbitManager_InvalidConnectionLazy(t *testing.T) {
 	assert.Never(t, shell.IsHealthy, time.Second, 100*time.Millisecond)
 }
 
-func TestGetChannel_WhenHealthy(t *testing.T) {
+func TestNewChannel_WhenHealthy(t *testing.T) {
 	requireDocker(t)
 
 	shell, err := rmqinitr.New(context.Background(),
@@ -145,12 +147,22 @@ func TestGetChannel_WhenHealthy(t *testing.T) {
 	defer cancel()
 	require.NoError(t, shell.WaitForHealth(ctx))
 
-	ch, err := shell.GetChannel()
-	assert.NoError(t, err)
-	assert.NotNil(t, ch)
+	ch, err := shell.NewChannel()
+	require.NoError(t, err)
+	require.NotNil(t, ch)
+
+	// The channel is caller-owned: closing it must leave the shell healthy and
+	// able to hand out another channel.
+	require.NoError(t, ch.Close())
+	assert.True(t, shell.IsHealthy())
+
+	again, err := shell.NewChannel()
+	require.NoError(t, err)
+	require.NotNil(t, again)
+	require.NoError(t, again.Close())
 }
 
-func TestGetChannel_WhenUnhealthy(t *testing.T) {
+func TestNewChannel_WhenUnhealthy(t *testing.T) {
 	shell, err := rmqinitr.New(context.Background(),
 		rmqinitr.WithConfig(&rmqinitr.Config{
 			URI:              "amqp://invalid:invalid@localhost:9999/",
@@ -161,13 +173,13 @@ func TestGetChannel_WhenUnhealthy(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = shell.Close(context.Background()) }()
 
-	ch, err := shell.GetChannel()
+	ch, err := shell.NewChannel()
 	assert.Error(t, err)
 	assert.Nil(t, ch)
 	assert.Equal(t, rmqinitr.ErrNotHealthy, err)
 }
 
-func TestGetChannel_AfterClose(t *testing.T) {
+func TestNewChannel_AfterClose(t *testing.T) {
 	requireDocker(t)
 
 	shell, err := rmqinitr.New(context.Background(),
@@ -182,7 +194,7 @@ func TestGetChannel_AfterClose(t *testing.T) {
 
 	require.NoError(t, shell.Close(context.Background()))
 
-	ch, err := shell.GetChannel()
+	ch, err := shell.NewChannel()
 	assert.Error(t, err)
 	assert.Nil(t, ch)
 	assert.Equal(t, rmqinitr.ErrShellClosed, err)
@@ -243,7 +255,8 @@ func TestConcurrentAccess(t *testing.T) {
 	defer cancel()
 	require.NoError(t, shell.WaitForHealth(ctx))
 
-	// Test concurrent access to GetChannel and IsHealthy.
+	// Concurrent access to NewChannel and IsHealthy, with each caller closing
+	// its own channel.
 	done := make(chan bool)
 	errs := make(chan error, 100)
 
@@ -251,13 +264,17 @@ func TestConcurrentAccess(t *testing.T) {
 		go func() {
 			defer func() { done <- true }()
 			for range 10 {
-				ch, err := shell.GetChannel()
+				ch, err := shell.NewChannel()
 				if err != nil {
 					errs <- err
 					return
 				}
 				if ch == nil {
 					errs <- fmt.Errorf("got nil channel")
+					return
+				}
+				if err := ch.Close(); err != nil {
+					errs <- err
 					return
 				}
 			}
@@ -282,6 +299,83 @@ func TestConcurrentAccess(t *testing.T) {
 		t.Fatalf("Concurrent access error: %v", err)
 	default:
 	}
+}
+
+// Closing a caller-owned channel must not be mistaken for a connection loss:
+// the shell keeps the same live connection and stays healthy.
+func TestClosingCallerChannelDoesNotReconnect(t *testing.T) {
+	requireDocker(t)
+
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.WithConfig(&rmqinitr.Config{URI: rabbitmqURI}))
+	require.NoError(t, err)
+	defer func() { _ = shell.Close(context.Background()) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	require.NoError(t, shell.WaitForHealth(ctx))
+
+	before, err := shell.GetConn()
+	require.NoError(t, err)
+
+	ch, err := shell.NewChannel()
+	require.NoError(t, err)
+	require.NoError(t, ch.Close())
+
+	// Allow an incorrect reconnect to run before asserting the connection is
+	// unchanged.
+	time.Sleep(300 * time.Millisecond)
+
+	after, err := shell.GetConn()
+	require.NoError(t, err)
+	assert.Same(t, before, after)
+	assert.True(t, shell.IsHealthy())
+}
+
+// Concurrent publishes and channel closes are caller-owned and must not
+// reconnect the shared connection.
+func TestConcurrentPublishAndClose(t *testing.T) {
+	requireDocker(t)
+
+	shell, err := rmqinitr.New(context.Background(),
+		rmqinitr.WithConfig(&rmqinitr.Config{URI: rabbitmqURI}))
+	require.NoError(t, err)
+	defer func() { _ = shell.Close(context.Background()) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	require.NoError(t, shell.WaitForHealth(ctx))
+
+	const workers = 8
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ch, err := shell.NewChannel()
+			if err != nil {
+				errs <- err
+				return
+			}
+			defer func() { _ = ch.Close() }()
+
+			queue := fmt.Sprintf("apin.concurrent.%d", i)
+			if _, err := ch.QueueDeclare(queue, false, true, true, false, nil); err != nil {
+				errs <- err
+				return
+			}
+			if err := ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{Body: []byte("ping")}); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent publish/close error: %v", err)
+	}
+	assert.True(t, shell.IsHealthy())
 }
 
 func TestWaitForHealth_Timeout(t *testing.T) {

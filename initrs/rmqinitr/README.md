@@ -1,8 +1,8 @@
 # rmqinitr
 
-RabbitMQ initr. Returns a shell with an auto-reconnecting AMQP
-connection/channel, guarded by a background reconnect loop with exponential
-backoff.
+RabbitMQ initr. Returns a shell with an auto-reconnecting AMQP connection,
+guarded by a background reconnect loop with exponential backoff. Channels are
+caller-owned and never drive reconnection.
 
 ```bash
 go get github.com/47monad/apin/initrs/rmqinitr
@@ -38,16 +38,17 @@ over whenever the connection drops.
 ## Shell
 
 ```go
-shell.IsHealthy()          // connection established and shell not closed
-shell.WaitForHealth(ctx)   // blocks until healthy or ctx done
-ch, err := shell.GetChannel() // ErrNotHealthy / ErrShellClosed otherwise
+shell.IsHealthy()             // connection established and shell not closed
+shell.WaitForHealth(ctx)      // blocks until healthy or ctx done
+ch, err := shell.NewChannel() // caller-owned; ErrNotHealthy / ErrShellClosed otherwise
 conn, err := shell.GetConn()
 ```
 
-A single shared channel is exposed for convenience. Producers and consumers
-with complex semantics should typically open their own channel via
-`GetConn` — the reconnection shell keeps the connection alive, not your
-channel state.
+`NewChannel` opens a channel on the current connection and returns it to the
+caller, who must close it. Closing a channel never marks the shell unhealthy or
+triggers a reconnect; only the connection's lifecycle drives the reconnect
+loop. After a reconnect, call `NewChannel` again to get a channel on the new
+connection. Use `GetConn` for native driver access.
 
 ## Options
 
@@ -76,7 +77,7 @@ behavior.
 ## Lifecycle
 
 `Close(ctx)` is idempotent: it stops the reconnect loop, cancels and interrupts
-an in-progress network dial/AMQP handshake, and closes the connection/channel.
+an in-progress network dial/AMQP handshake, and closes the connection.
 It waits only until `ctx` is done; if native resource cleanup is still running,
 that cleanup continues in the background. A custom `WithNativeDialConfig` dial
 callback has no context parameter, but shutdown still returns by the supplied
