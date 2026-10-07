@@ -27,6 +27,7 @@ release_modules=(
 	initrs/pginitr
 	initrs/promgrpcinitr
 	initrs/prominitr
+	initrs/redisinitr
 	initrs/rmqinitr
 	initrs/zapinitr
 )

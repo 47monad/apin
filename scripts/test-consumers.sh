@@ -13,6 +13,7 @@ modules=(
 	initrs/pginitr
 	initrs/promgrpcinitr
 	initrs/prominitr
+	initrs/redisinitr
 	initrs/rmqinitr
 	initrs/zapinitr
 )
@@ -75,6 +76,14 @@ for module_dir in "${modules[@]}"; do
 					;;
 			esac
 		fi
+		if [[ "$module_dir" == "initrs/redisinitr" ]]; then
+			case "$dependency" in
+				go.mongodb.org/*|go.etcd.io/*|github.com/rabbitmq/*|google.golang.org/grpc*|github.com/jackc/pgx/*|github.com/grpc-ecosystem/*)
+					echo "redisinitr consumer dependency graph contains forbidden $dependency" >&2
+					exit 1
+					;;
+			esac
+		fi
 	done < "$temp_root/${module_dir//\//_}/deps.txt"
 
 	if [[ "$module_dir" == "initrs/pginitr" ]] && ! grep -Eq '^github\.com/jackc/pgx/v5($|/)' "$consumer_dir/deps.txt"; then
@@ -83,6 +92,10 @@ for module_dir in "${modules[@]}"; do
 	fi
 	if [[ "$module_dir" == "initrs/promgrpcinitr" ]] && ! grep -Eq '^google\.golang\.org/grpc($|/)' "$consumer_dir/deps.txt"; then
 		echo "promgrpcinitr consumer dependency graph does not include grpc" >&2
+		exit 1
+	fi
+	if [[ "$module_dir" == "initrs/redisinitr" ]] && ! grep -Eq '^github\.com/redis/go-redis/v9($|/)' "$consumer_dir/deps.txt"; then
+		echo "redisinitr consumer dependency graph does not include go-redis" >&2
 		exit 1
 	fi
 done

@@ -150,6 +150,7 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection; `Ready(ctx)` pings |
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
 | [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection; caller-owned channels via `NewChannel`; `Ready(ctx)` reports current state, `WaitForHealth` waits |
+| [`initrs/redisinitr`](initrs/redisinitr) | `Shell{Client}` | lazy universal client (standalone/Sentinel/cluster); `Ready(ctx)` pings |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry}` | private Prometheus registry; optional Go/process collectors |
 | [`initrs/promgrpcinitr`](initrs/promgrpcinitr) | `Shell{UnaryInterceptor, StreamInterceptor, ServerMetrics}` | optional gRPC server instrumentation adapter |
