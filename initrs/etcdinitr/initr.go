@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -71,6 +72,14 @@ func resolveConfig(opts []Option) (*resolvedConfig, error) {
 	}
 	if config.opts.DialTimeout < 0 {
 		return nil, fmt.Errorf("etcd dial timeout must not be negative")
+	}
+	if len(config.opts.Endpoints) == 0 {
+		return nil, fmt.Errorf("etcd endpoints must not be empty")
+	}
+	for i, endpoint := range config.opts.Endpoints {
+		if strings.TrimSpace(endpoint) == "" {
+			return nil, fmt.Errorf("etcd endpoint %d must not be blank", i)
+		}
 	}
 	return config, nil
 }

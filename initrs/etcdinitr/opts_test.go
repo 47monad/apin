@@ -19,7 +19,7 @@ func TestConfigAndOptionPrecedenceThroughNew(t *testing.T) {
 
 	_, err := etcdinitr.New(context.Background(),
 		etcdinitr.WithConfig(&etcdinitr.Config{
-			Endpoints: "config-a:2379,config-b:2379",
+			Endpoints: []string{"config-a:2379", "config-b:2379"},
 			Username:  "config-user",
 			Password:  "config-pass",
 			Timeout:   &timeout,
@@ -114,6 +114,40 @@ func TestInvalidTimeoutsThroughNew(t *testing.T) {
 				t.Fatalf("New() error = %v, want substring %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestEndpointsValidation(t *testing.T) {
+	tests := []struct {
+		name string
+		opts []etcdinitr.Option
+		want string
+	}{
+		{name: "nil endpoints", opts: []etcdinitr.Option{etcdinitr.WithEndpoints(nil)}, want: "must not be empty"},
+		{name: "empty config endpoints", opts: []etcdinitr.Option{etcdinitr.WithConfig(&etcdinitr.Config{})}, want: "must not be empty"},
+		{name: "blank endpoint", opts: []etcdinitr.Option{etcdinitr.WithEndpoints([]string{"127.0.0.1:2379", "  "})}, want: "must not be blank"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := etcdinitr.New(context.Background(), tt.opts...)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("New() error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestWithEndpointsCopiesCallerSlice(t *testing.T) {
+	endpoints := []string{"127.0.0.1:2379"}
+	shell, err := etcdinitr.New(context.Background(), etcdinitr.WithEndpoints(endpoints))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() { _ = shell.Close(context.Background()) }()
+
+	endpoints[0] = "mutated:2379"
+	if got := shell.Client.Endpoints(); !reflect.DeepEqual(got, []string{"127.0.0.1:2379"}) {
+		t.Fatalf("endpoints = %v, want the copy made at construction time", got)
 	}
 }
 

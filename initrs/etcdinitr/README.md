@@ -46,9 +46,9 @@ etcdShell, err := etcdinitr.New(ctx,
 ```
 
 `New` validates the configuration and constructs the native client without
-verifying endpoint connectivity. Call `Ready(ctx)` to check whether any
-configured endpoint responds to an etcd status request. Pass a
-deadline-bearing context to bound the check.
+verifying endpoint connectivity. It rejects an empty endpoint list and blank
+entries. Call `Ready(ctx)` to check whether any configured endpoint responds to
+an etcd status request. Pass a deadline-bearing context to bound the check.
 
 ## Shell
 
@@ -76,9 +76,10 @@ returns an error.
 ## Config mapping
 
 `Config` is decoded by the application's loader, not by etcdinitr. `Endpoints`
-remains comma-separated and `Timeout` is an optional positive number of
-seconds. An omitted timeout leaves the native client's timeout unset, while an
-explicit zero or negative timeout is rejected. Later options override
+is a non-empty list of endpoints; when supplied through an environment variable
+the config loader splits it on commas. `Timeout` is an optional positive number
+of seconds. An omitted timeout leaves the native client's timeout unset, while
+an explicit zero or negative timeout is rejected. Later options override
 individual configured values.
 
 Options are sealed: callers can compose the named options but cannot mutate
