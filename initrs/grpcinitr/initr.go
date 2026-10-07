@@ -95,6 +95,9 @@ func newServer(_ context.Context, config *resolvedConfig) (*ServerShell, error) 
 		grpc.ChainUnaryInterceptor(
 			config.interceptors...,
 		),
+		grpc.ChainStreamInterceptor(
+			config.streamInterceptors...,
+		),
 	}
 	serverOptions = append(serverOptions, config.serverOptions...)
 	shell.Server = grpc.NewServer(serverOptions...)

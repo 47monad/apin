@@ -133,6 +133,38 @@ func TestServerOptionsAndInterceptorsRemainAvailable(t *testing.T) {
 	require.True(t, strings.Contains(err.Error(), "native server option reached"))
 }
 
+func TestStreamInterceptorRemainsAvailable(t *testing.T) {
+	streamInterceptorCalled := false
+	shell, err := grpcinitr.New(t.Context(),
+		grpcinitr.WithHealthCheck(true),
+		grpcinitr.WithStreamInterceptor(func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+			streamInterceptorCalled = true
+			return handler(srv, stream)
+		}),
+	)
+	require.NoError(t, err)
+	defer func() { _ = shell.Close(t.Context()) }()
+
+	listener := bufconn.Listen(1024 * 1024)
+	defer func() { _ = listener.Close() }()
+	go func() { _ = shell.Server.Serve(listener) }()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	conn, err := grpc.NewClient("passthrough:///bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() }),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+
+	stream, err := grpc_health_v1.NewHealthClient(conn).Watch(ctx, &grpc_health_v1.HealthCheckRequest{Service: "api"})
+	require.NoError(t, err)
+	_, err = stream.Recv()
+	require.NoError(t, err)
+	require.True(t, streamInterceptorCalled)
+}
+
 func TestRunHealthCheckUpdatesHealthServiceAndStopsOnContext(t *testing.T) {
 	shell, err := grpcinitr.New(t.Context(), grpcinitr.WithHealthCheck(true))
 	require.NoError(t, err)

@@ -25,6 +25,7 @@ release_modules=(
 	initrs/httpinitr
 	initrs/mongoinitr
 	initrs/pginitr
+	initrs/promgrpcinitr
 	initrs/prominitr
 	initrs/rmqinitr
 	initrs/zapinitr

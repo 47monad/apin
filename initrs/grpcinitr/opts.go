@@ -7,12 +7,13 @@ import (
 )
 
 type resolvedConfig struct {
-	port          int
-	interceptors  []grpc.UnaryServerInterceptor
-	serverOptions []grpc.ServerOption
-	healthCheck   bool
-	reflection    bool
-	runnable      func(*grpc.Server)
+	port               int
+	interceptors       []grpc.UnaryServerInterceptor
+	streamInterceptors []grpc.StreamServerInterceptor
+	serverOptions      []grpc.ServerOption
+	healthCheck        bool
+	reflection         bool
+	runnable           func(*grpc.Server)
 }
 
 // Option is a sealed functional option accepted by New and NewServer.
@@ -62,6 +63,14 @@ func WithHealthCheck(enabled bool) Option {
 func WithInterceptor(i grpc.UnaryServerInterceptor) Option {
 	return optionFunc(func(s *resolvedConfig) error {
 		s.interceptors = append(s.interceptors, i)
+		return nil
+	})
+}
+
+// WithStreamInterceptor appends a stream interceptor in registration order.
+func WithStreamInterceptor(i grpc.StreamServerInterceptor) Option {
+	return optionFunc(func(s *resolvedConfig) error {
+		s.streamInterceptors = append(s.streamInterceptors, i)
 		return nil
 	})
 }

@@ -12,6 +12,7 @@ use (
 	./initrs/mongoinitr
 	./initrs/mongoinitr/integrationtest
 	./initrs/pginitr
+	./initrs/promgrpcinitr
 	./initrs/prominitr
 	./initrs/prominitr/integrationtest
 	./initrs/rmqinitr
