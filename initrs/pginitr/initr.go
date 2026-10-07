@@ -3,8 +3,6 @@ package pginitr
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/url"
 	"sync"
 	"time"
 
@@ -51,14 +49,14 @@ func MustNew(ctx context.Context, opts ...Option) *Shell {
 }
 
 func New(ctx context.Context, opts ...Option) (*Shell, error) {
-	config, err := resolveConfig(opts)
+	config, err := resolve(opts)
 	if err != nil {
 		return nil, err
 	}
 
 	switch config.mode {
 	case ModeConn:
-		connConfig, err := pgx.ParseConfig(config.uri.String())
+		connConfig, err := pgx.ParseConfig(config.compose().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse postgres config: %w", err)
 		}
@@ -76,7 +74,7 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 			Conn: conn,
 		}, nil
 	case ModePool:
-		cfg, err := pgxpool.ParseConfig(config.uri.String())
+		cfg, err := pgxpool.ParseConfig(config.compose().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse postgres config: %w", err)
 		}
@@ -97,32 +95,6 @@ func New(ctx context.Context, opts ...Option) (*Shell, error) {
 	default:
 		return nil, fmt.Errorf("invalid pginitr mode: %q", config.mode)
 	}
-}
-
-func resolveConfig(opts []Option) (*resolvedConfig, error) {
-	config := &resolvedConfig{
-		uri:  &url.URL{Scheme: "postgres"},
-		mode: ModePool,
-	}
-	if err := apply(config, opts); err != nil {
-		return nil, err
-	}
-
-	// Compose the pending port with the host, regardless of option order.
-	if config.port != "" {
-		if host := config.uri.Hostname(); host != "" {
-			config.uri.Host = net.JoinHostPort(host, config.port)
-		}
-	}
-
-	if config.uri.User == nil && config.uri.Host == "" && config.uri.Path == "" {
-		return nil, fmt.Errorf("pginitr: no postgres configuration provided; pass WithConfig, WithURI, or connection options such as WithHost/WithDBName")
-	}
-	if err := validateConfig(config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
 }
 
 func applyPoolConfigOptions(config *pgxpool.Config, options []poolConfigOption) error {
