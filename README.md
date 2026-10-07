@@ -149,7 +149,7 @@ Every initr follows the same contract, so any service reads the same way:
 | [`initrs/pginitr`](initrs/pginitr) | `Shell{Mode, Pool, Conn}` | lazy connectivity; `Ready(ctx)` (alias `Ping(ctx)`) verifies the active pool or connection; `DB()` gives a mode-independent query surface |
 | [`initrs/mongoinitr`](initrs/mongoinitr) | `Shell{Client, DB}` | ping-checked connection; `Ready(ctx)` pings |
 | [`initrs/etcdinitr`](initrs/etcdinitr) | `Shell{Client}` | lazy connectivity; `Ready(ctx)` verifies that a configured endpoint responds |
-| [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection/channel; `Ready(ctx)` reports current state, `WaitForHealth` waits |
+| [`initrs/rmqinitr`](initrs/rmqinitr) | `Shell` | auto-reconnecting connection; caller-owned channels via `NewChannel`; `Ready(ctx)` reports current state, `WaitForHealth` waits |
 | [`initrs/grpcinitr`](initrs/grpcinitr) | `ServerShell{Server, HealthServer}` | health/reflection, `RunHealthCheck`, ctx-aware `Serve` |
 | [`initrs/prominitr`](initrs/prominitr) | `Shell{Registry, GRPCServerInterceptor, GRPCServerMetrics}` | optional gRPC instrumentation adapter |
 | [`initrs/zapinitr`](initrs/zapinitr) | `zapinitr.Shell` | initializer-owned logger shell |
