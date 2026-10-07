@@ -18,41 +18,58 @@ import (
 )
 
 // Load decodes configPath into destination, then overlays values from envPath
-// and the process environment. A missing envPath is optional. Process
-// environment values take precedence over values from envPath, which take
-// precedence over values in the configuration file.
+// and the process environment. An empty configPath skips file decoding, so
+// configuration may be supplied through the environment alone. A missing
+// envPath is optional. Process environment values take precedence over values
+// from envPath, which take precedence over values in the configuration file.
+//
+// A present-but-empty environment value is a value, not an absence: it
+// overrides lower-precedence sources, becomes an empty string or empty string
+// slice, and reports a contextual conversion error for scalar fields.
 // destination must be a non-nil pointer.
 func Load(configPath, envPath string, destination any) error {
+	where := loadContext(configPath)
 	dst := reflect.ValueOf(destination)
 	if !dst.IsValid() || dst.Kind() != reflect.Pointer || dst.IsNil() {
-		return fmt.Errorf("load config file %q: destination must be a non-nil pointer", configPath)
+		return fmt.Errorf("%s: destination must be a non-nil pointer", where)
 	}
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("load config file %q: %w", configPath, err)
-	}
-	switch strings.ToLower(filepath.Ext(configPath)) {
-	case ".json":
-		err = decodeJSON(data, destination)
-	case ".yaml", ".yml":
-		err = decodeYAML(data, destination)
-	default:
-		err = fmt.Errorf("unsupported configuration file extension %q", filepath.Ext(configPath))
-	}
-	if err != nil {
-		return fmt.Errorf("load config file %q: %w", configPath, err)
+	if configPath != "" {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return fmt.Errorf("load config file %q: %w", configPath, err)
+		}
+		switch strings.ToLower(filepath.Ext(configPath)) {
+		case ".json":
+			err = decodeJSON(data, destination)
+		case ".yaml", ".yml":
+			err = decodeYAML(data, destination)
+		default:
+			err = fmt.Errorf("unsupported configuration file extension %q", filepath.Ext(configPath))
+		}
+		if err != nil {
+			return fmt.Errorf("load config file %q: %w", configPath, err)
+		}
 	}
 
 	vars, err := readEnvFile(envPath)
 	if err != nil {
-		return fmt.Errorf("load config file %q: read env file %q: %w", configPath, envPath, err)
+		return fmt.Errorf("%s: read env file %q: %w", where, envPath, err)
 	}
 	overlay := newEnvOverlay(vars)
 	if err := applyEnv(dst.Elem(), "", dst.Elem().Type().Name(), overlay); err != nil {
-		return fmt.Errorf("load config file %q: %w", configPath, err)
+		return fmt.Errorf("%s: %w", where, err)
 	}
 	return nil
+}
+
+// loadContext names the source of a loading error. Environment-only loading has
+// no configuration file, so the message does not fabricate an empty path.
+func loadContext(configPath string) string {
+	if configPath == "" {
+		return "load config"
+	}
+	return fmt.Sprintf("load config file %q", configPath)
 }
 
 // MustLoad is Load but panics when loading or overlaying configuration fails.
@@ -246,10 +263,36 @@ func setEnvValue(field reflect.Value, raw string) error {
 			return err
 		}
 		field.SetFloat(value)
+	case reflect.Slice:
+		if field.Type().Elem().Kind() != reflect.String {
+			return fmt.Errorf("unsupported environment field type %s", field.Type())
+		}
+		entries := splitList(raw)
+		slice := reflect.MakeSlice(field.Type(), len(entries), len(entries))
+		for i, entry := range entries {
+			slice.Index(i).SetString(entry)
+		}
+		field.Set(slice)
 	default:
 		return fmt.Errorf("unsupported environment field type %s", field.Type())
 	}
 	return nil
+}
+
+// splitList decodes a comma-separated environment value into trimmed entries.
+// Blanks between separators are preserved so consumers can validate them. An
+// empty or whitespace-only value decodes to an empty list.
+func splitList(raw string) []string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return []string{}
+	}
+	parts := strings.Split(trimmed, ",")
+	entries := make([]string, len(parts))
+	for i, part := range parts {
+		entries[i] = strings.TrimSpace(part)
+	}
+	return entries
 }
 
 func containsEnvValue(value reflect.Value, prefix string, overlay *envOverlay) bool {

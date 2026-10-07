@@ -8,13 +8,31 @@ import (
 	"github.com/47monad/apin/config"
 )
 
+// unsetEnv removes key for the duration of the test. An explicit empty process
+// value now means an explicit empty configuration, so isolation requires real
+// absence rather than t.Setenv(key, "").
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	previous, present := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
 func TestExampleAggregateLoadsSelectedInitializers(t *testing.T) {
 	for _, path := range []string{"config.json", "config.yaml"} {
 		t.Run(path, func(t *testing.T) {
-			t.Setenv("API_HTTP_PORT", "")
-			t.Setenv("API_GRPC_REFLECTION", "")
-			t.Setenv("API_GRPC_HEALTH_CHECK", "")
-			t.Setenv("POSTGRES_HOST", "")
+			unsetEnv(t, "API_HTTP_PORT")
+			unsetEnv(t, "API_GRPC_REFLECTION")
+			unsetEnv(t, "API_GRPC_HEALTH_CHECK")
+			unsetEnv(t, "POSTGRES_HOST")
 
 			cfg, err := loadServiceConfig(path)
 			if err != nil {

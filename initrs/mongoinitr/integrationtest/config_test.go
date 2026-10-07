@@ -11,6 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// unsetEnv removes key for the duration of the test. An explicit empty process
+// value now means an explicit empty configuration, so isolation requires real
+// absence rather than t.Setenv(key, "").
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	previous, present := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
 type serviceConfig struct {
 	Name  string             `json:"name" yaml:"name"`
 	Mongo *mongoinitr.Config `json:"mongo" yaml:"mongo"`
@@ -19,7 +37,7 @@ type serviceConfig struct {
 func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 	t.Run("JSON file, dotenv, process environment", func(t *testing.T) {
 		t.Setenv("MONGODB_URI", "mongodb://process:27017")
-		t.Setenv("MONGODB_DB_NAME", "")
+		unsetEnv(t, "MONGODB_DB_NAME")
 		root := t.TempDir()
 		configPath := filepath.Join(root, "service.json")
 		envPath := filepath.Join(root, ".env")
@@ -35,8 +53,8 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 	})
 
 	t.Run("YAML", func(t *testing.T) {
-		t.Setenv("MONGODB_URI", "")
-		t.Setenv("MONGODB_DB_NAME", "")
+		unsetEnv(t, "MONGODB_URI")
+		unsetEnv(t, "MONGODB_DB_NAME")
 		configPath := filepath.Join(t.TempDir(), "service.yaml")
 		require.NoError(t, os.WriteFile(configPath, []byte("name: yaml\nmongo:\n  uri: mongodb://yaml:27017\n  dbName: yaml-db\n"), 0o600))
 

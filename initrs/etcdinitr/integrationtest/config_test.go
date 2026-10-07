@@ -11,6 +11,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// unsetEnv removes key for the duration of the test. An explicit empty process
+// value now means an explicit empty configuration, so isolation requires real
+// absence rather than t.Setenv(key, "").
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	previous, present := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
 type serviceConfig struct {
 	Name string            `json:"name" yaml:"name"`
 	Etcd *etcdinitr.Config `json:"etcd" yaml:"etcd"`
@@ -19,7 +37,7 @@ type serviceConfig struct {
 func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 	t.Run("JSON file, dotenv, process environment", func(t *testing.T) {
 		t.Setenv("ETCD_ENDPOINTS", "process:2379")
-		t.Setenv("ETCD_USERNAME", "")
+		unsetEnv(t, "ETCD_USERNAME")
 		t.Setenv("ETCD_TIMEOUT", "12")
 		root := t.TempDir()
 		configPath := filepath.Join(root, "service.json")
@@ -39,10 +57,10 @@ func TestConfigFormatsAndEnvironmentOverlay(t *testing.T) {
 	})
 
 	t.Run("YAML", func(t *testing.T) {
-		t.Setenv("ETCD_ENDPOINTS", "")
-		t.Setenv("ETCD_USERNAME", "")
-		t.Setenv("ETCD_PASSWORD", "")
-		t.Setenv("ETCD_TIMEOUT", "")
+		unsetEnv(t, "ETCD_ENDPOINTS")
+		unsetEnv(t, "ETCD_USERNAME")
+		unsetEnv(t, "ETCD_PASSWORD")
+		unsetEnv(t, "ETCD_TIMEOUT")
 		configPath := filepath.Join(t.TempDir(), "service.yaml")
 		require.NoError(t, os.WriteFile(configPath, []byte("name: yaml\netcd:\n  endpoints: yaml:2379\n  username: yaml-user\n  password: yaml-pass\n  timeout: 7\n"), 0o600))
 
