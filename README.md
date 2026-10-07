@@ -207,9 +207,16 @@ pginitr.New(ctx,
 The loader reads `.env` values without changing the process environment.
 Precedence is process environment > `.env` file > configuration file.
 
+An empty `configPath` skips file decoding, so configuration can be supplied
+through the environment alone. A present-but-empty environment value is an
+explicit value, not an absence: it overrides every lower-precedence source,
+clears string fields, decodes `[]string` fields from trimmed comma-separated
+entries, and makes scalar conversion fail with field and variable context.
+
 A nil pointer field is materialized only when an environment value exists
-beneath it, and a self-referential type is materialized at most once per
-scope, so a recursive configuration type cannot grow an unbounded chain.
+beneath it (including an explicit empty value), and a self-referential type is
+materialized at most once per scope, so a recursive configuration type cannot
+grow an unbounded chain.
 
 An initializer can also be configured entirely through options.
 

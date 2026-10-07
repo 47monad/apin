@@ -3,6 +3,7 @@ package config_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -31,6 +32,11 @@ type pointerIntConfig struct {
 	Timeout *int `json:"timeout" yaml:"timeout" env:"test_timeout"`
 }
 
+// listConfig exercises comma-separated string-slice environment decoding.
+type listConfig struct {
+	Items []string `json:"items" yaml:"items" env:"items"`
+}
+
 // recursiveConfig reaches itself through a pointer, which the overlay must
 // handle without materializing an unbounded chain of instances.
 type recursiveConfig struct {
@@ -48,10 +54,28 @@ func writeFile(t *testing.T, name, contents string) string {
 	return path
 }
 
+// unsetEnv removes key for the duration of the test. Unlike t.Setenv(key, ""),
+// which now means an explicit empty value, this restores genuine absence so a
+// lower-precedence source can win.
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	previous, present := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(key, previous)
+			return
+		}
+		_ = os.Unsetenv(key)
+	})
+}
+
 func TestLoadJSONYAMLAndEnvironmentPrecedence(t *testing.T) {
 	t.Setenv("APP_NAME", "from-process")
 	t.Setenv("API_PORT", "9000")
-	t.Setenv("DB_HOST", "")
+	unsetEnv(t, "DB_HOST")
 
 	for _, tc := range []struct {
 		name string
@@ -72,8 +96,8 @@ func TestLoadJSONYAMLAndEnvironmentPrecedence(t *testing.T) {
 			if got.Name != "from-process" || got.Nested.Host != "env-host" || got.Servers["api"].Port != 9000 {
 				t.Errorf("loaded config = %+v, want process/file overlays", got)
 			}
-			if value, ok := os.LookupEnv("DB_HOST"); !ok || value != "" {
-				t.Errorf("Load() changed process DB_HOST = %q, present = %v", value, ok)
+			if value, ok := os.LookupEnv("DB_HOST"); ok {
+				t.Errorf("Load() created process DB_HOST = %q, want it left unset", value)
 			}
 		})
 	}
@@ -147,7 +171,7 @@ func TestLoadEnvironmentConversionErrorHasFieldAndFileContext(t *testing.T) {
 }
 
 func TestLoadAppliesEnvironmentToOptionalPointer(t *testing.T) {
-	t.Setenv("DB_HOST", "")
+	unsetEnv(t, "DB_HOST")
 	configPath := writeFile(t, "app.json", `{}`)
 	var withoutEnv pointerConfig
 	if err := config.Load(configPath, "", &withoutEnv); err != nil {
@@ -179,12 +203,12 @@ func TestLoadAppliesEnvironmentToOptionalScalarPointer(t *testing.T) {
 		t.Fatalf("Load() timeout = %v, want process value 9", destination.Timeout)
 	}
 
+	// An explicit empty process value is presence: converting it to a scalar
+	// must fail with context rather than silently fall back to the env file.
 	t.Setenv("TEST_TIMEOUT", "")
-	if err := config.Load(configPath, envPath, &destination); err != nil {
-		t.Fatalf("Load() with empty process value error = %v", err)
-	}
-	if destination.Timeout == nil || *destination.Timeout != 8 {
-		t.Fatalf("Load() timeout = %v, want dotenv value 8", destination.Timeout)
+	err := config.Load(configPath, envPath, &destination)
+	if err == nil || !strings.Contains(err.Error(), "TEST_TIMEOUT") || !strings.Contains(err.Error(), "Timeout") {
+		t.Fatalf("Load() with empty process value error = %v, want contextual conversion error", err)
 	}
 }
 
@@ -275,6 +299,106 @@ func TestLoadRecursiveTypeUnderDistinctMapKeys(t *testing.T) {
 	}
 	if len(got.Peers) != 2 {
 		t.Errorf("peers = %+v, want both entries", got.Peers)
+	}
+}
+
+// Env-only loading has no configuration file: the destination starts zero and
+// the environment is the sole source.
+func TestLoadEnvOnlyWithoutConfigFile(t *testing.T) {
+	t.Setenv("APP_NAME", "env-only")
+	t.Setenv("DB_HOST", "env-host")
+	var got applicationConfig
+	if err := config.Load("", "", &got); err != nil {
+		t.Fatalf("Load() env-only error = %v", err)
+	}
+	if got.Name != "env-only" || got.Nested.Host != "env-host" {
+		t.Fatalf("loaded config = %+v, want process environment values", got)
+	}
+}
+
+func TestLoadEnvOnlyWithEnvFile(t *testing.T) {
+	unsetEnv(t, "APP_NAME")
+	envPath := writeFile(t, "app.env", "APP_NAME=env-file\n")
+	var got applicationConfig
+	if err := config.Load("", envPath, &got); err != nil {
+		t.Fatalf("Load() env-only with env file error = %v", err)
+	}
+	if got.Name != "env-file" {
+		t.Fatalf("Name = %q, want env file value", got.Name)
+	}
+}
+
+func TestLoadEmptyConfigPathStillValidatesDestination(t *testing.T) {
+	if err := config.Load("", "", applicationConfig{}); err == nil || !strings.Contains(err.Error(), "pointer") {
+		t.Errorf("Load() env-only with non-pointer destination error = %v, want pointer error", err)
+	}
+	var nilDestination *applicationConfig
+	if err := config.Load("", "", nilDestination); err == nil || !strings.Contains(err.Error(), "nil") {
+		t.Errorf("Load() env-only with nil destination error = %v, want nil error", err)
+	}
+}
+
+func TestLoadDecodesStringSlicesFromEnvironment(t *testing.T) {
+	t.Setenv("ITEMS", " first , second ,, third ")
+	var got listConfig
+	if err := config.Load("", "", &got); err != nil {
+		t.Fatalf("Load() slice error = %v", err)
+	}
+	want := []string{"first", "second", "", "third"}
+	if !reflect.DeepEqual(got.Items, want) {
+		t.Fatalf("Items = %#v, want %#v", got.Items, want)
+	}
+}
+
+func TestLoadDecodesEmptyStringSliceFromExplicitEmptyValue(t *testing.T) {
+	t.Setenv("ITEMS", "")
+	var got listConfig
+	if err := config.Load("", "", &got); err != nil {
+		t.Fatalf("Load() empty slice error = %v", err)
+	}
+	if len(got.Items) != 0 {
+		t.Fatalf("Items = %#v, want empty", got.Items)
+	}
+}
+
+func TestLoadDecodesStringSliceFromEnvFile(t *testing.T) {
+	unsetEnv(t, "ITEMS")
+	envPath := writeFile(t, "app.env", "ITEMS=a,b\n")
+	var got listConfig
+	if err := config.Load("", envPath, &got); err != nil {
+		t.Fatalf("Load() slice env file error = %v", err)
+	}
+	if want := []string{"a", "b"}; !reflect.DeepEqual(got.Items, want) {
+		t.Fatalf("Items = %#v, want %#v", got.Items, want)
+	}
+}
+
+// An explicit empty process value overrides both the env file and the config
+// file, clearing a string field rather than being treated as absent.
+func TestLoadExplicitEmptyProcessValueOverridesFiles(t *testing.T) {
+	t.Setenv("DB_HOST", "")
+	configPath := writeFile(t, "app.json", `{"nested":{"host":"file-host"}}`)
+	envPath := writeFile(t, "app.env", "DB_HOST=env-host\n")
+	var got pointerConfig
+	if err := config.Load(configPath, envPath, &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Nested == nil || got.Nested.Host != "" {
+		t.Fatalf("Nested = %+v, want materialized with empty host", got.Nested)
+	}
+}
+
+// An explicit empty env-file value likewise overrides the config file.
+func TestLoadExplicitEmptyEnvFileValueOverridesConfigFile(t *testing.T) {
+	unsetEnv(t, "DB_HOST")
+	configPath := writeFile(t, "app.json", `{"nested":{"host":"file-host"}}`)
+	envPath := writeFile(t, "app.env", "DB_HOST=\n")
+	var got pointerConfig
+	if err := config.Load(configPath, envPath, &got); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.Nested == nil || got.Nested.Host != "" {
+		t.Fatalf("Nested = %+v, want materialized with empty host", got.Nested)
 	}
 }
 

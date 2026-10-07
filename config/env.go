@@ -18,10 +18,13 @@ func readEnvFile(path string) (map[string]string, error) {
 	return vars, err
 }
 
+// lookupEnv resolves name with process-environment presence taking precedence
+// over the env file. A present-but-empty value is a value, not an absence, so
+// an explicit empty configuration survives the overlay.
 func lookupEnv(name string, fileVars map[string]string) (string, bool) {
-	if value, ok := os.LookupEnv(name); ok && value != "" {
+	if value, ok := os.LookupEnv(name); ok {
 		return value, true
 	}
 	value, ok := fileVars[name]
-	return value, ok && value != ""
+	return value, ok
 }
