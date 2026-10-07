@@ -52,10 +52,9 @@ if [[ "$mode" == "release" ]]; then
 	done
 fi
 
-mapfile -d '' module_files < <(find . -name go.mod -not -path './.git/*' -print0 | sort -z)
 temp_root=$(mktemp -d "${TMPDIR:-/tmp}/apin-release-check.XXXXXX")
 trap 'rm -rf -- "$temp_root"' EXIT
-for go_mod in "${module_files[@]}"; do
+while IFS= read -r -d '' go_mod; do
 	module_dir="${go_mod%/go.mod}"
 	echo "validating Go module ${module_dir#./}"
 	(
@@ -66,10 +65,9 @@ for go_mod in "${module_files[@]}"; do
 			check_sum="${check_mod%.mod}.sum"
 			cp go.mod "$check_mod"
 			if [[ -f go.sum ]]; then
-				cp go.sum "$check_sum"
 				# The replacement uses this checkout rather than the published root
 				# module, so its version checksums are unused in the temporary graph.
-				sed -i '/^github\.com\/47monad\/apin v/d' "$check_sum"
+				grep -v '^github\.com/47monad/apin v' go.sum > "$check_sum" || true
 			fi
 			go mod edit -modfile="$check_mod" -replace="github.com/47monad/apin=$repo_root"
 			go mod tidy -diff -modfile="$check_mod"
@@ -83,7 +81,7 @@ for go_mod in "${module_files[@]}"; do
 			go test ./...
 		fi
 	)
-done
+done < <(find . -name go.mod -not -path './.git/*' -print0 | sort -z)
 
 bash scripts/test-consumers.sh
 
